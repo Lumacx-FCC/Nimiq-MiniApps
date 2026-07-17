@@ -6,5 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Allow access through Cloudflare quick tunnels (phone testing).
+    allowedHosts: ['.trycloudflare.com'],
   },
 })

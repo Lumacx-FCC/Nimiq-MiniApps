@@ -12,9 +12,12 @@ export async function payNim(nimAmount: number, reference: string): Promise<stri
   const nimiq = await getNimiq()
   const { nimTreasuryAddress, appId } = getConfig()
 
-  return await nimiq.sendBasicTransactionWithData({
+  const result = await nimiq.sendBasicTransactionWithData({
     recipient: nimTreasuryAddress,
     value: Math.round(nimAmount * LUNA_PER_NIM),
     data: `${appId}:${reference}`,
   })
+  if (typeof result !== 'string')
+    throw new Error(result.error?.message || 'NIM payment failed')
+  return result
 }

@@ -29,6 +29,8 @@ export function isInsideNimiqPay(): boolean {
 export async function loginWithNimiq(): Promise<AuthUser> {
   const nimiq = await getNimiq()
   const accounts = await nimiq.listAccounts()
+  if (!Array.isArray(accounts))
+    throw new Error(accounts.error?.message || 'Nimiq wallet returned an error')
   const address = accounts[0]
   if (!address)
     throw new Error('No Nimiq account available')

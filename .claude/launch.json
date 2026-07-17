@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "core-modules",
       "port": 5173
+    },
+    {
+      "name": "otherme-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "otherme-app",
+      "port": 5174
     }
   ]
 }
