@@ -51,6 +51,78 @@ function send(res: ServerResponse, status: number, payload: unknown): void {
 }
 
 /* ------------------------------------------------------------------ */
+/* Temporary file share: WebView download fallback                     */
+/* ------------------------------------------------------------------ */
+
+// The Nimiq Pay WebView supports neither anchor downloads nor the Web Share
+// API, so the client uploads the file here and shows the user a short-lived
+// link to open in a real browser (where downloading works).
+const SHARE_TTL_MS = 30 * 60 * 1000
+const SHARE_MAX_ENTRIES = 40
+const shareStore = new Map<string, { bytes: Buffer, type: string, filename: string, at: number }>()
+
+function sweepShareStore(): void {
+  const now = Date.now()
+  for (const [id, entry] of shareStore) {
+    if (now - entry.at > SHARE_TTL_MS)
+      shareStore.delete(id)
+  }
+  while (shareStore.size > SHARE_MAX_ENTRIES) {
+    const oldest = shareStore.keys().next().value
+    if (!oldest)
+      break
+    shareStore.delete(oldest)
+  }
+}
+
+function readRawBody(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('File too large to share (max 25 MB)'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+async function createShare(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const bytes = await readRawBody(req)
+  if (!bytes.length)
+    return send(res, 400, { error: 'Empty file' })
+  sweepShareStore()
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+  const filename = decodeURIComponent(String(req.headers['x-filename'] || 'download')).replace(/[/\\"\r\n]/g, '-').slice(0, 120)
+  shareStore.set(id, {
+    bytes,
+    type: String(req.headers['content-type'] || 'application/octet-stream'),
+    filename,
+    at: Date.now(),
+  })
+  send(res, 200, { url: `/api/share/${id}`, expiresInMinutes: SHARE_TTL_MS / 60000 })
+}
+
+function serveShare(id: string, res: ServerResponse): void {
+  sweepShareStore()
+  const entry = shareStore.get(id)
+  if (!entry) {
+    return send(res, 404, { error: 'This download link has expired — generate it again from the app.' })
+  }
+  res.statusCode = 200
+  res.setHeader('Content-Type', entry.type)
+  res.setHeader('Content-Length', entry.bytes.length)
+  res.setHeader('Content-Disposition', `attachment; filename="${entry.filename}"`)
+  res.end(entry.bytes)
+}
+
+/* ------------------------------------------------------------------ */
 /* Character sheet: Gemini vision analysis                             */
 /* ------------------------------------------------------------------ */
 
@@ -259,7 +331,7 @@ async function inferProfile(apiKey: string, imageBase64: string, mimeType: strin
           role: 'user',
           content: [
             { type: 'input_image', image_url: dataUrl },
-            { type: 'input_text', text: `Read this ${subject === 'object' ? 'object' : 'human or humanoid character'} reference. Return only compact JSON with keys name, alias, summary, systemPrompt. The systemPrompt must make a real-time roleplay voice agent embody the visible personality, lore, behavior and speaking style while staying in character. ${subject === 'object' ? 'The subject is an object: do not describe it as human or invent a human identity.' : ''} Use ${fallbackName || 'the visible name'} when uncertain.` },
+            { type: 'input_text', text: `Read this ${subject === 'object' ? 'object' : 'human or humanoid character'} reference. Return only compact JSON with keys name, alias, summary, systemPrompt, gender. The systemPrompt must make a real-time roleplay voice agent embody the visible personality, lore, behavior and speaking style while staying in character. gender must be exactly "female", "male" or "object" based on the subject's visible presentation${subject === 'object' ? ' (this subject is an object, so gender must be "object")' : ''}. ${subject === 'object' ? 'The subject is an object: do not describe it as human or invent a human identity.' : ''} Use ${fallbackName || 'the visible name'} when uncertain.` },
           ],
         }],
       }),
@@ -433,10 +505,17 @@ export function apiPlugin(): Plugin {
         const url = (req.url || '').split('?')[0]
         if (!url.startsWith('/api/'))
           return next()
+
+        // Share links are fetched by a plain browser tab (GET, raw bytes).
+        if (req.method === 'GET' && url.startsWith('/api/share/'))
+          return serveShare(url.slice('/api/share/'.length), res)
+
         if (req.method !== 'POST')
           return send(res, 405, { error: 'Method not allowed' })
 
         try {
+          if (url === '/api/share')
+            return await createShare(req, res)
           if (url === '/api/gemini-token')
             return await geminiToken(res)
           const body = await readBody(req)

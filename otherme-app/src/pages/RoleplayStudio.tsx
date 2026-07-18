@@ -70,6 +70,13 @@ const BACKGROUNDS = [
   { id: 'forest', label: { en: 'Rune forest', es: 'Bosque rúnico' }, url: '/backgrounds/forest.webp' },
   { id: 'tavern', label: { en: 'Ember tavern', es: 'Taberna de brasas' }, url: '/backgrounds/tavern.webp' },
   { id: 'ruins', label: { en: 'Lost archive', es: 'Archivo perdido' }, url: '/backgrounds/ruins.webp' },
+  { id: 'city-rooftop', label: { en: 'City rooftop', es: 'Azotea urbana' }, url: '/backgrounds/city-rooftop.webp' },
+  { id: 'cozy-cafe', label: { en: 'Cozy café', es: 'Café acogedor' }, url: '/backgrounds/cozy-cafe.webp' },
+  { id: 'creative-studio', label: { en: 'Creative studio', es: 'Estudio creativo' }, url: '/backgrounds/creative-studio.webp' },
+  { id: 'lakeside-retreat', label: { en: 'Lakeside retreat', es: 'Refugio junto al lago' }, url: '/backgrounds/lakeside-retreat.webp' },
+  { id: 'playful-arcade', label: { en: 'Playful arcade', es: 'Arcade retro' }, url: '/backgrounds/playful-arcade.webp' },
+  { id: 'storybook-library', label: { en: 'Storybook library', es: 'Biblioteca de cuentos' }, url: '/backgrounds/storybook-library.webp' },
+  { id: 'tropical-beach', label: { en: 'Tropical beach', es: 'Playa tropical' }, url: '/backgrounds/tropical-beach.webp' },
 ]
 
 const VOICES: Array<{ name: VoiceName, gender: 'male' | 'female', tone: { en: string, es: string } }> = [
@@ -131,6 +138,10 @@ const COPY = {
     insufficientImageCredits: `You need ${AVATAR_SPRITE_CREDITS} credits to generate a talking sprite`,
     demo: 'Demo mode',
     demoHelp: 'Voice runs on Gemini Live once the server key is configured.',
+    changeAvatar: 'Change Avatar',
+    voicesComingSoon: 'More voices and backgrounds coming soon!',
+    micUnavailable: 'Microphone unavailable — allow mic access for Nimiq Pay in your phone settings, or type below to talk.',
+    storeFailed: 'Avatar created, but device storage is full — it will be lost when you leave. Delete an old avatar or character to keep it.',
   },
   es: {
     studio: 'ESTUDIO DE AVATARES',
@@ -181,6 +192,10 @@ const COPY = {
     insufficientImageCredits: `Necesitas ${AVATAR_SPRITE_CREDITS} créditos para generar un sprite parlante`,
     demo: 'Modo demostración',
     demoHelp: 'La voz usa Gemini Live cuando la clave del servidor está configurada.',
+    changeAvatar: 'Cambiar Avatar',
+    voicesComingSoon: '¡Más voces y fondos muy pronto!',
+    micUnavailable: 'Micrófono no disponible — permite el acceso al micrófono para Nimiq Pay en los ajustes del teléfono, o escribe abajo para hablar.',
+    storeFailed: 'Avatar creado, pero el almacenamiento está lleno — se perderá al salir. Elimina un avatar o personaje antiguo para conservarlo.',
   },
 } as const
 
@@ -229,6 +244,34 @@ async function fileToDataUrl(file: File): Promise<string> {
 function splitDataUrl(dataUrl: string): { base64: string, mimeType: string } {
   const [header, base64] = dataUrl.split(',')
   return { base64, mimeType: header.match(/data:(.*?);/)?.[1] || 'image/png' }
+}
+
+/**
+ * Sprite generation is a long request; through the cloudflare tunnel the
+ * connection occasionally drops ("Failed to fetch"). Retry the network layer
+ * a couple of times before surfacing an actionable error.
+ */
+async function fetchWithRetry(input: RequestInfo, init: RequestInit, attempts = 3): Promise<Response> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fetch(input, init)
+    }
+    catch (error) {
+      if (attempt >= attempts)
+        throw new Error('Network connection dropped while generating. Check your connection and try again.')
+      await new Promise(resolve => setTimeout(resolve, 1200 * attempt))
+    }
+  }
+}
+
+function defaultVoiceFor(gender: AvatarProfile['gender']): VoiceName | null {
+  if (gender === 'female')
+    return 'Sulafat'
+  if (gender === 'male')
+    return 'Zubenelgenubi'
+  if (gender === 'object')
+    return 'Puck'
+  return null // legacy avatars without detected gender keep the current voice
 }
 
 async function optimizeReferenceImage(file: File) {
@@ -294,7 +337,10 @@ async function removeChromaGreen(dataUrl: string) {
     }
   }
   context.putImageData(pixels, 0, 0)
-  return canvas.toDataURL('image/png')
+  // WebP keeps the alpha channel at a fraction of PNG's size — sprites must
+  // fit the shared localStorage budget (~5 MB) to survive across sessions.
+  const webp = canvas.toDataURL('image/webp', 0.92)
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png')
 }
 
 function makeId() {
@@ -344,6 +390,7 @@ export default function RoleplayStudio() {
   const [usageCredits, setUsageCredits] = useState(0)
   const [extraUnlocked, setExtraUnlocked] = useState(() => localStorage.getItem(EXTRA_SLOTS_KEY) === 'true')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [railGlow, setRailGlow] = useState(false)
   const [uploadSlot, setUploadSlot] = useState<number | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadName, setUploadName] = useState('')
@@ -362,7 +409,7 @@ export default function RoleplayStudio() {
   const outputSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const mouthAnimationRef = useRef<number | null>(null)
   const transcriptRef = useRef('')
-  const chatEndRef = useRef<HTMLDivElement | null>(null)
+  const messageListRef = useRef<HTMLDivElement | null>(null)
   const userSpeechUntilRef = useRef(0)
   const modelSpeechUntilRef = useRef(0)
   const usageMillisecondsRef = useRef(0)
@@ -425,8 +472,12 @@ export default function RoleplayStudio() {
     return () => window.clearInterval(timer)
   }, [])
 
+  // Scroll only the chat panel itself — scrollIntoView would drag the whole
+  // page down to the conversation log mid-talk, breaking stage immersion.
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const list = messageListRef.current
+    if (list)
+      list.scrollTop = list.scrollHeight
   }, [messages])
 
   const flash = useCallback((text: string) => {
@@ -702,8 +753,17 @@ export default function RoleplayStudio() {
         },
       })
       sessionRef.current = session
-      if (withMic)
-        await startMicrophone(session)
+      if (withMic) {
+        // Mic failure (WebView permission, busy device) must not kill the
+        // session — voice output + typed input still work without it.
+        try {
+          await startMicrophone(session)
+        }
+        catch {
+          flash(t.micUnavailable)
+          setLiveState('listening')
+        }
+      }
       return session
     }
     catch (error) {
@@ -712,7 +772,7 @@ export default function RoleplayStudio() {
       flash(`${t.demo}: ${message}`)
       return null
     }
-  }, [activeAvatar.systemPrompt, clearOutput, flash, lang, playPcm, startMicrophone, stopSession, t.demo, voice])
+  }, [activeAvatar.systemPrompt, clearOutput, flash, lang, playPcm, startMicrophone, stopSession, t.demo, t.micUnavailable, voice])
 
   const previewVoice = async () => {
     if (liveState !== 'idle')
@@ -773,7 +833,7 @@ export default function RoleplayStudio() {
       const optimizedFile = await optimizeReferenceImage(uploadFile)
       const dataUrl = await fileToDataUrl(optimizedFile)
       const { base64, mimeType } = splitDataUrl(dataUrl)
-      const response = await fetch('/api/generate-avatar', {
+      const response = await fetchWithRetry('/api/generate-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -783,17 +843,20 @@ export default function RoleplayStudio() {
           subjectType: uploadSubject,
         }),
       })
-      const result = await response.json() as { spriteDataUrl?: string, profile?: { name?: string, alias?: string, summary?: string, systemPrompt?: string }, error?: string }
+      const result = await response.json() as { spriteDataUrl?: string, profile?: { name?: string, alias?: string, summary?: string, systemPrompt?: string, gender?: string }, error?: string }
       if (!response.ok || !result.spriteDataUrl)
         throw new Error(result.error || 'Generation failed')
       const transparentSpriteDataUrl = await removeChromaGreen(result.spriteDataUrl)
       const id = `custom-${uploadSlot}-${Date.now()}`
       const name = result.profile?.name || uploadName || 'New Character'
+      const detectedGender: AvatarProfile['gender'] = uploadSubject === 'object'
+        ? 'object'
+        : result.profile?.gender === 'female' ? 'female' : result.profile?.gender === 'male' ? 'male' : 'custom'
       const avatar: AvatarProfile = {
         id,
         name,
         alias: result.profile?.alias || 'The Newcomer',
-        gender: 'custom',
+        gender: detectedGender,
         custom: true,
         slot: uploadSlot,
         summary: { en: result.profile?.summary || 'A new story waits to be told.', es: result.profile?.summary || 'Una nueva historia espera ser contada.' },
@@ -802,18 +865,22 @@ export default function RoleplayStudio() {
       }
       const nextAvatars = [...customAvatars.filter(item => item.slot !== uploadSlot), avatar]
       setCustomAvatars(nextAvatars)
-      persistAvatars(nextAvatars)
+      const persisted = persistAvatars(nextAvatars)
       setOutfitId('original')
       setMessages([])
       resetUsage()
       setActiveId(id)
+      const voiceDefault = defaultVoiceFor(detectedGender)
+      if (voiceDefault)
+        setVoice(voiceDefault)
       setUploadSlot(null)
       setUploadFile(null)
       setUploadName('')
       setUploadSubject('human')
       creditsApi.spend(AVATAR_SPRITE_CREDITS)
-      flash(t.stored)
-      window.setTimeout(() => flash(t.imageCost), 150)
+      flash(persisted ? t.stored : t.storeFailed)
+      if (persisted)
+        window.setTimeout(() => flash(t.imageCost), 150)
     }
     catch (error) {
       flash(error instanceof Error ? error.message : 'Generation failed')
@@ -859,10 +926,21 @@ export default function RoleplayStudio() {
       void stopSession()
     const nextAvatar = allAvatars.find(item => item.id === id) || BUILT_IN_AVATARS[0]
     setOutfitId(nextAvatar.outfits[0]?.id || 'original')
+    const voiceDefault = defaultVoiceFor(nextAvatar.gender)
+    if (voiceDefault)
+      setVoice(voiceDefault)
     setMessages([])
     resetUsage()
     setActiveId(id)
     setSidebarOpen(false)
+  }
+
+  // Guide the user to the character rail (top-left) with a temporary glow.
+  const changeAvatar = () => {
+    setSidebarOpen(true)
+    setRailGlow(true)
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+    window.setTimeout(() => setRailGlow(false), 2600)
   }
 
   const handleCustomAvatarSelect = (event: MouseEvent<HTMLButtonElement>) => {
@@ -902,7 +980,7 @@ export default function RoleplayStudio() {
       </header>
 
       <div className="workspace-grid">
-        <aside className={`character-rail ${sidebarOpen ? 'open' : ''}`}>
+        <aside className={`character-rail ${sidebarOpen ? 'open' : ''} ${railGlow ? 'glow' : ''}`}>
           <div className="rail-heading"><span>{t.characters}</span><button className="icon-button close-rail" onClick={() => setSidebarOpen(false)}><X size={18} /></button></div>
           <div className="avatar-list">
             {BUILT_IN_AVATARS.map(avatar => (
@@ -947,9 +1025,6 @@ export default function RoleplayStudio() {
           <div className="stage-toolbar">
             <div className="stage-nav-actions">
               <Link to="/" className="toolbar-nav-button"><ArrowLeft size={14} />{t.backHome}</Link>
-              <button className="toolbar-nav-button widget-button" onClick={() => void downloadAvatar(activeAvatar)}>
-                <Download size={14} />{t.downloadAvatar}
-              </button>
             </div>
             <div className="stage-selectors">
               <label><span><ImageIcon size={14} />{t.scene}</span><select value={backgroundId} onChange={event => setBackgroundId(event.target.value)}>{BACKGROUNDS.map(item => <option key={item.id} value={item.id}>{item.label[lang]}</option>)}</select><ChevronDown size={14} /></label>
@@ -964,6 +1039,10 @@ export default function RoleplayStudio() {
             <div className="character-caption">
               <div><span>{t.talkingWith}</span><h1>{activeAvatar.name}</h1></div>
             </div>
+            <button className="change-avatar-button" onClick={changeAvatar}>
+              <UserRound size={17} />
+              {t.changeAvatar}
+            </button>
             <button className={`live-button ${liveState !== 'idle' ? 'active' : ''}`} onClick={toggleLive} disabled={liveState === 'connecting'}>
               {liveState === 'connecting' ? <LoaderCircle className="spin" size={20} /> : liveState === 'idle' ? <Mic size={20} /> : <MicOff size={20} />}
               {liveState === 'idle' ? t.live : liveState === 'connecting' ? t.connecting : t.end}
@@ -974,6 +1053,7 @@ export default function RoleplayStudio() {
         <aside className="conversation-panel">
           <section className="voice-section">
             <div className="panel-title"><span><Volume2 size={16} />{t.voice}</span><small>Gemini Live</small></div>
+            <p className="coming-soon-flag"><Sparkles size={12} />{t.voicesComingSoon}</p>
             <div className="voice-grid">
               {VOICES.map(item => (
                 <button key={item.name} className={`voice-option ${voice === item.name ? 'active' : ''}`} onClick={() => setVoice(item.name)}>
@@ -993,12 +1073,11 @@ export default function RoleplayStudio() {
 
           <section className="chat-section">
             <div className="panel-title"><span><MessageCircle size={16} />{t.chat}</span><span className="secure-label">LOCAL</span></div>
-            <div className="message-list">
+            <div className="message-list" ref={messageListRef}>
               {!messages.length && (
                 <div className="empty-conversation"><div><MessageCircle size={22} /></div><p>{lang === 'es' ? `Habla con ${activeAvatar.alias} por voz o escribe para comenzar.` : `Speak with ${activeAvatar.alias} by voice or type to begin.`}</p><small>{t.demoHelp}</small></div>
               )}
               {messages.map(message => <div key={message.id} className={`message ${message.role}`}><span>{message.role === 'user' ? (lang === 'es' ? 'Tú' : 'You') : activeAvatar.alias}</span><p>{message.text}</p></div>)}
-              <div ref={chatEndRef} />
             </div>
             <form className="chat-input" onSubmit={sendText}>
               <input value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.placeholder} aria-label={t.placeholder} />
@@ -1029,7 +1108,12 @@ export default function RoleplayStudio() {
               {uploadFile ? <><Check size={24} /><strong>{uploadFile.name}</strong><small>{(uploadFile.size / 1024 / 1024).toFixed(1)} MB</small></> : <><Upload size={26} /><strong>{t.chooseFile}</strong><small>PNG · JPG · WEBP · max 20 MB</small></>}
             </label>
             {generating && <div className="generation-progress"><span><i /></span><p>{t.generating}</p></div>}
-            <div className="modal-actions"><button className="secondary-button" onClick={() => setUploadSlot(null)} disabled={generating}>{t.cancel}</button><button className="primary-button" onClick={generateAvatar} disabled={!uploadFile || generating || balance < AVATAR_SPRITE_CREDITS}>{generating ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}{t.generate} · {AVATAR_SPRITE_CREDITS} {t.credits}</button></div>
+            {balance < AVATAR_SPRITE_CREDITS && (
+              <p className="modal-help" role="alert" style={{ color: 'var(--nimiq-gold, #e9b213)', fontWeight: 700 }}>
+                {t.insufficientImageCredits} — <Link to="/credits" style={{ color: 'inherit', textDecoration: 'underline' }}>{t.addCredits}</Link>
+              </p>
+            )}
+            <div className="modal-actions"><button className="secondary-button" onClick={() => setUploadSlot(null)} disabled={generating}>{t.cancel}</button><button className="primary-button" onClick={generateAvatar} disabled={!uploadFile || generating}>{generating ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}{t.generate} · {AVATAR_SPRITE_CREDITS} {t.credits}</button></div>
           </section>
         </div>
       )}

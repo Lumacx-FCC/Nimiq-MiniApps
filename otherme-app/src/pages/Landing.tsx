@@ -8,7 +8,7 @@
  */
 import {
   ArrowRight, BriefcaseBusiness, ChevronDown, Clapperboard, CloudUpload,
-  MessageCircle, MessagesSquare, Share2, Sparkles, UserRound, Video,
+  MessageCircle, MessagesSquare, MonitorPlay, Share2, Sparkles, UserRound, Video,
 } from 'lucide-react'
 import { ChangeEvent, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -16,6 +16,7 @@ import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
 import { listSheets } from '../character/library'
 import AppHeader from '../components/AppHeader'
+import Lightbox from '../components/Lightbox'
 
 const COPY = {
   en: {
@@ -32,7 +33,7 @@ const COPY = {
     comingSoon: 'Coming Soon',
     genScenes: 'Generate Scenes',
     genVideo: 'Generate Video',
-    genInsights: 'Generate insights',
+    tutorial: 'Tutorial',
     collab: 'Professional Collab',
     roleplay: 'Dynamic Roleplay',
     social: 'Social interaction',
@@ -54,7 +55,7 @@ const COPY = {
     comingSoon: 'Próximamente',
     genScenes: 'Generar Escenas',
     genVideo: 'Generar Video',
-    genInsights: 'Generar Insights',
+    tutorial: 'Tutorial',
     collab: 'Colaboración Profesional',
     roleplay: 'Roleplay Dinámico',
     social: 'Interacción Social',
@@ -77,6 +78,8 @@ export default function Landing() {
   const t = COPY[lang]
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [showTutorial, setShowTutorial] = useState(false)
+  const [lightbox, setLightbox] = useState<{ src: string, alt: string } | null>(null)
   const characters = useMemo(() => (isLoggedIn ? listSheets() : []), [isLoggedIn])
 
   const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -101,11 +104,9 @@ export default function Landing() {
     window.setTimeout(() => setNotice(null), 3000)
   }
 
-  const openFeature = (route: '/scenes' | '/videos' | null) => {
+  const openFeature = (route: '/scenes' | '/videos') => {
     if (!isLoggedIn)
-      return navigate('/login', { state: { notice: t.loginFirst, redirectTo: route ?? '/' } })
-    if (!route)
-      return flash(t.comingSoon)
+      return navigate('/login', { state: { notice: t.loginFirst, redirectTo: route } })
     navigate(route)
   }
 
@@ -120,9 +121,9 @@ export default function Landing() {
   }
 
   const activeChips = [
-    { label: t.genScenes, icon: Clapperboard, route: '/scenes' as const },
-    { label: t.genVideo, icon: Video, route: '/videos' as const },
-    { label: t.genInsights, icon: BriefcaseBusiness, route: null },
+    { label: t.genScenes, icon: Clapperboard, onClick: () => openFeature('/scenes') },
+    { label: t.genVideo, icon: Video, onClick: () => openFeature('/videos') },
+    { label: t.tutorial, icon: MonitorPlay, onClick: () => setShowTutorial(true) },
   ]
 
   const comingSoonCards = [
@@ -208,11 +209,11 @@ export default function Landing() {
                   </button>
                 </div>
                 {!characters.length && <p className="text-sm m-0" style={{ color: 'var(--text-60)' }}>{t.noCharacters}</p>}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                   {characters.map(sheet => (
                     <div key={sheet.id} className="flex items-center gap-3 p-2 rounded-xl" style={{ background: 'var(--highlight-bg)' }}>
                       {sheet.imageDataUrl
-                        ? <img src={sheet.imageDataUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                        ? <img src={sheet.imageDataUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 cursor-zoom-in" onClick={() => setLightbox({ src: sheet.imageDataUrl!, alt: sheet.name })} />
                         : <span className="w-14 h-14 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--nq-card)' }}><UserRound size={18} style={{ color: 'var(--om-teal)' }} /></span>}
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-sm truncate m-0">{sheet.name}</p>
@@ -237,12 +238,12 @@ export default function Landing() {
       {/* ---- Section 3: Elena showcase — active bubbles above, coming soon below ---- */}
       <section className="rounded-3xl overflow-hidden shadow-xl mb-5" style={{ background: 'var(--nq-card)' }}>
         <div className="grid grid-cols-3 gap-2 p-3">
-          {activeChips.map(({ label, icon: Icon, route }) => (
+          {activeChips.map(({ label, icon: Icon, onClick }) => (
             <button
               key={label}
               className="rounded-xl px-2 py-3 text-center text-[11px] font-bold flex flex-col items-center gap-1.5 transition-transform active:scale-95 float-slow"
               style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
-              onClick={() => openFeature(route)}
+              onClick={onClick}
             >
               <Icon size={18} style={{ color: 'var(--om-teal)' }} />
               {label}
@@ -284,6 +285,35 @@ export default function Landing() {
       <footer className="text-center text-sm font-bold pb-2" style={{ color: 'var(--text-60)' }}>
         {t.footer}
       </footer>
+
+      {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
+
+      {/* Tutorial video — unmounting the iframe on click-away stops playback. */}
+      {showTutorial && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center p-4"
+          style={{ background: 'rgba(4,8,12,.8)' }}
+          onClick={() => setShowTutorial(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ background: 'var(--nq-card)' }}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="aspect-video">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube-nocookie.com/embed/V3fPfa8Rr0s?autoplay=1"
+                title={t.tutorial}
+                style={{ border: 0 }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {notice && (
         <div

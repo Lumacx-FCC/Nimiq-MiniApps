@@ -13,7 +13,7 @@ export interface AvatarProfile {
   id: string
   name: string
   alias: string
-  gender: 'male' | 'female' | 'custom'
+  gender: 'male' | 'female' | 'object' | 'custom'
   custom?: boolean
   slot?: number
   summary: { en: string, es: string }

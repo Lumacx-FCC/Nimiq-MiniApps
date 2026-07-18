@@ -88,7 +88,8 @@
 .rp-root .mobile-menu, .rp-root .close-rail { display: none; }
 
 .rp-root .workspace-grid {
-  height: calc(100vh - 72px); position: relative; z-index: 2; display: grid;
+  /* No z-index here: it would trap the fixed mobile rail (z 60) below the scrim (z 50). */
+  height: calc(100vh - 72px); position: relative; display: grid;
   grid-template-columns: 248px minmax(470px, 1fr) 356px; max-width: 1840px; margin: 0 auto;
 }
 
@@ -152,6 +153,18 @@
 .rp-root .live-button:hover { transform: translateY(-1px); }
 .rp-root .live-button.active { color: #f5d8d5; background: rgba(92,24,25,.84); border-color: rgba(239,119,108,.45); }
 .rp-root .live-button:disabled { opacity: .7; cursor: wait; }
+
+.rp-root .change-avatar-button { position: absolute; z-index: 6; right: 20px; bottom: 78px; height: 42px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); background: rgba(4,8,9,.62); color: var(--text); padding: 0 17px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; font-weight: 700; cursor: pointer; backdrop-filter: blur(12px); transition: .2s; }
+.rp-root .change-avatar-button:hover { border-color: var(--line-strong); color: var(--emerald); transform: translateY(-1px); }
+
+.rp-root .character-rail.glow { animation: rp-railPulse 1.25s ease-in-out 2; }
+@keyframes rp-railPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(66,216,174,.55), 0 0 26px rgba(66,216,174,.3); }
+  50% { box-shadow: 0 0 0 3px rgba(66,216,174,.95), 0 0 58px rgba(66,216,174,.55); }
+}
+
+.rp-root .coming-soon-flag { display: inline-flex; align-items: center; gap: 6px; margin: -4px 0 11px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(213,184,113,.28); background: rgba(213,184,113,.08); color: var(--gold); font-size: 9px; font-weight: 600; letter-spacing: .04em; }
+.rp-root .coming-soon-flag svg { color: var(--gold); }
 
 .rp-root .conversation-panel { min-height: 0; border-left: 1px solid var(--line); background: var(--rail-veil); backdrop-filter: blur(18px); padding: 15px; display: grid; grid-template-rows: auto auto minmax(0,1fr); gap: 12px; }
 .rp-root .voice-section, .rp-root .character-background-section, .rp-root .chat-section { border: 1px solid var(--line); background: var(--panel-veil); border-radius: 13px; padding: 13px; }
@@ -281,6 +294,7 @@
   .rp-root .character-caption { right: 20px; bottom: 76px; }
   .rp-root .character-caption h1 { font-size: 29px; }
   .rp-root .live-button { left: 20px; right: 20px; width: calc(100% - 40px); }
+  .rp-root .change-avatar-button { left: 20px; right: 20px; width: calc(100% - 40px); bottom: 76px; }
   .rp-root .conversation-panel { min-height: 620px; border-left: 0; border-top: 1px solid var(--line); grid-template-rows: auto auto 1fr; padding: 10px; }
   .rp-root .voice-grid { grid-template-columns: repeat(3, 1fr); }
   .rp-root .voice-option > svg { display: none; }

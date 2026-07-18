@@ -1,10 +1,12 @@
 /**
  * Reference picker shared by the Scene and Video creators: attach saved
- * characters and/or upload new images as identity references — max 3 total.
+ * characters, saved scenes (max 1, video creator only) and/or upload new
+ * images as identity references — max 3 total.
  */
-import { Plus, UserRound, X } from 'lucide-react'
+import { Clapperboard, Plus, UserRound, X } from 'lucide-react'
 import { ChangeEvent, useRef } from 'react'
 import type { SavedSheet } from '../character/library'
+import type { SavedScene } from '../core/mediaStore'
 import type { Lang } from '../app/providers'
 
 export interface PickedReference {
@@ -13,6 +15,8 @@ export interface PickedReference {
   imageDataUrl: string
   /** Present when the reference is a saved character (identity anchors). */
   sheet?: SavedSheet
+  /** Marks a saved scene reference (only one allowed at a time). */
+  kind?: 'scene'
 }
 
 const COPY = {
@@ -21,17 +25,21 @@ const COPY = {
     upload: 'Upload image',
     maxed: 'Maximum 3 references',
     savedLabel: 'Saved characters',
+    savedScenes: 'Saved scenes (pick 1 as setting)',
   },
   es: {
     counter: (n: number, max: number) => `${n}/${max} referencias`,
     upload: 'Subir imagen',
     maxed: 'Máximo 3 referencias',
     savedLabel: 'Personajes guardados',
+    savedScenes: 'Escenas guardadas (elige 1 como ambiente)',
   },
 } as const
 
-export default function ReferencePicker({ characters, value, onChange, lang, max = 3 }: {
+export default function ReferencePicker({ characters, scenes, value, onChange, lang, max = 3 }: {
   characters: SavedSheet[]
+  /** Saved scenes offered as an optional setting reference (video creator). */
+  scenes?: SavedScene[]
   value: PickedReference[]
   onChange: (next: PickedReference[]) => void
   lang: Lang
@@ -48,6 +56,17 @@ export default function ReferencePicker({ characters, value, onChange, lang, max
     if (full || !sheet.imageDataUrl)
       return
     onChange([...value, { id: sheet.id, name: sheet.name, imageDataUrl: sheet.imageDataUrl, sheet }])
+  }
+
+  const toggleScene = (scene: SavedScene) => {
+    const existing = value.find(item => item.id === scene.id)
+    if (existing)
+      return onChange(value.filter(item => item.id !== scene.id))
+    // Only one scene reference: picking a new one replaces the current one.
+    const withoutScenes = value.filter(item => item.kind !== 'scene')
+    if (withoutScenes.length >= max)
+      return
+    onChange([...withoutScenes, { id: scene.id, name: scene.name, imageDataUrl: scene.imageDataUrl, kind: 'scene' }])
   }
 
   const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -105,6 +124,34 @@ export default function ReferencePicker({ characters, value, onChange, lang, max
         </button>
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleUpload} />
       </div>
+
+      {!!scenes?.length && (
+        <div className="mt-3">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-60)' }}>
+            {t.savedScenes}
+          </span>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {scenes.map((scene) => {
+              const selected = value.some(item => item.id === scene.id)
+              return (
+                <button
+                  key={scene.id}
+                  onClick={() => toggleScene(scene)}
+                  disabled={!selected && full && !value.some(item => item.kind === 'scene')}
+                  className="shrink-0 w-32 rounded-xl p-2 text-center border-2 disabled:opacity-40"
+                  style={{ borderColor: selected ? 'var(--om-teal)' : 'transparent', background: 'var(--highlight-bg)' }}
+                >
+                  <img src={scene.imageDataUrl} alt="" className="w-full h-16 object-cover rounded-lg" />
+                  <span className="text-[11px] font-bold truncate mt-1 flex items-center justify-center gap-1" style={{ color: 'var(--text-100)' }}>
+                    <Clapperboard size={11} style={{ color: 'var(--om-teal)' }} />
+                    <span className="truncate">{scene.name}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {value.length > 0 && (
         <div className="flex gap-2 flex-wrap mt-2">

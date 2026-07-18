@@ -14,9 +14,11 @@ import { RenderStyle, styleDirective } from '../character/fields'
 import { downloadDataUrl, listSheets } from '../character/library'
 import { SavedScene, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
+import Lightbox from '../components/Lightbox'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
 
 const FREE_SCENES_KEY = 'otherme:free-scenes'
+const VIDEO_REFERENCE_KEY = 'otherme:video-reference'
 
 const COPY = {
   en: {
@@ -116,6 +118,7 @@ export default function Scenes() {
   const [result, setResult] = useState<string | null>(null)
   const [gallery, setGallery] = useState<SavedScene[]>([])
   const [notice, setNotice] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
+  const [lightbox, setLightbox] = useState<{ src: string, alt: string } | null>(null)
   const [freeUsed, setFreeUsed] = useState(() => {
     const value = Number(localStorage.getItem(FREE_SCENES_KEY))
     return Number.isFinite(value) && value >= 0 ? value : 0
@@ -204,6 +207,17 @@ export default function Scenes() {
 
   const toVideo = (scene?: SavedScene) => {
     const firstCharacter = references.find(reference => reference.sheet)
+    // Carry the scene image itself into the video creator as a reference.
+    const imageDataUrl = scene?.imageDataUrl ?? result
+    if (imageDataUrl) {
+      try {
+        sessionStorage.setItem(VIDEO_REFERENCE_KEY, JSON.stringify({
+          imageDataUrl,
+          name: scene?.name || description.trim().slice(0, 40) || 'Scene',
+        }))
+      }
+      catch { /* image too large for sessionStorage — the picker lets them re-attach */ }
+    }
     navigate('/videos', { state: { characterId: firstCharacter?.id ?? null, seedPrompt: scene?.prompt ?? description.trim() } })
   }
 
@@ -266,7 +280,12 @@ export default function Scenes() {
           {result && (
             <section className="om-card">
               <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.result}</h2>
-              <img src={result} alt="Generated scene" className="w-full h-auto rounded-xl shadow-lg" />
+              <img
+                src={result}
+                alt="Generated scene"
+                className="w-full h-auto rounded-xl shadow-lg cursor-zoom-in"
+                onClick={() => setLightbox({ src: result, alt: description.trim() || 'Generated scene' })}
+              />
               <div className="flex gap-2 mt-3 flex-wrap">
                 <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={saveScene}><Save size={15} />{t.save}</button>
                 <button className="icon-chip" onClick={() => downloadDataUrl(result, 'otherme-scene.webp')}><Download size={14} />{t.download}</button>
@@ -281,10 +300,15 @@ export default function Scenes() {
             <Clapperboard size={14} />{t.gallery}
           </h2>
           {!gallery.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 max-h-[540px] overflow-y-auto pr-1">
             {gallery.map(scene => (
               <div key={scene.id} className="rounded-xl overflow-hidden" style={{ background: 'var(--highlight-bg)' }}>
-                <img src={scene.imageDataUrl} alt={scene.name} className="w-full h-28 object-cover" />
+                <img
+                  src={scene.imageDataUrl}
+                  alt={scene.name}
+                  className="w-full h-28 object-cover cursor-zoom-in"
+                  onClick={() => setLightbox({ src: scene.imageDataUrl, alt: scene.name })}
+                />
                 <div className="p-2">
                   <p className="text-[11px] font-bold truncate m-0">{scene.name}</p>
                   {scene.characterName && <p className="text-[10px] m-0" style={{ color: 'var(--text-40)' }}>{scene.characterName}</p>}
@@ -299,6 +323,8 @@ export default function Scenes() {
           </div>
         </section>
       </div>
+
+      {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
 
       {notice && (
         <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>

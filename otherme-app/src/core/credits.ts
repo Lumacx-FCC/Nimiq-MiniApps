@@ -10,6 +10,7 @@ import { payNim } from '@core/credits/payNim'
 import { payUsdt } from '@core/credits/payUsdt'
 import { quoteNim, quoteUsdt } from '@core/credits/pricing'
 import { getNimUsdRate } from '@core/credits/rates'
+import { WELCOME_CREDITS } from './config'
 import { createStore, useStore } from './store'
 
 export interface PurchaseRecord {
@@ -35,8 +36,15 @@ const storageKey = (userId: string) => `${getConfig().appId}:credits:${userId}`
 export function loadCreditsFor(userId: string): void {
   try {
     const raw = localStorage.getItem(storageKey(userId))
-    const parsed = raw ? JSON.parse(raw) as { balance: number, history: PurchaseRecord[] } : null
-    creditsStore.set({ balance: parsed?.balance ?? 0, history: parsed?.history ?? [], isPaying: false, error: null })
+    if (!raw) {
+      // First session for this account — welcome credits fund the starter renders.
+      creditsStore.set({ balance: WELCOME_CREDITS, history: [], isPaying: false, error: null })
+      loadedForUser = userId
+      persist()
+      return
+    }
+    const parsed = JSON.parse(raw) as { balance: number, history: PurchaseRecord[] }
+    creditsStore.set({ balance: parsed.balance ?? 0, history: parsed.history ?? [], isPaying: false, error: null })
   }
   catch {
     creditsStore.set({ balance: 0, history: [], isPaying: false, error: null })

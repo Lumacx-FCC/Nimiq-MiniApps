@@ -13,7 +13,7 @@ import { credits as creditsApi, useCredits } from '../core/credits'
 import { VIDEO_CREDITS, VIDEO_MAX_EDITS } from '../core/config'
 import { compileVideoPrompt } from '../character/fields'
 import { downloadDataUrl, listSheets } from '../character/library'
-import { SavedVideo, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
+import { SavedScene, SavedVideo, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
 
@@ -21,6 +21,8 @@ function splitDataUrl(dataUrl: string): { base64: string, mimeType: string } {
   const [header, base64] = dataUrl.split(',')
   return { base64, mimeType: header.match(/data:(.*?);/)?.[1] || 'image/png' }
 }
+
+const VIDEO_REFERENCE_KEY = 'otherme:video-reference'
 
 const COPY = {
   en: {
@@ -84,14 +86,34 @@ export default function Videos() {
   const characters = useMemo(() => listSheets(), [])
   const state = (location.state || {}) as { characterId?: string, seedPrompt?: string }
   const [references, setReferences] = useState<PickedReference[]>(() => {
-    const sheet = characters.find(item => item.id === (state.characterId ?? characters[0]?.id))
-    return sheet?.imageDataUrl ? [{ id: sheet.id, name: sheet.name, imageDataUrl: sheet.imageDataUrl, sheet }] : []
+    const initial: PickedReference[] = []
+    // Scene → Video handoff: the generated scene image rides along as a reference.
+    let sceneHandoff = false
+    try {
+      const raw = sessionStorage.getItem(VIDEO_REFERENCE_KEY)
+      if (raw) {
+        sessionStorage.removeItem(VIDEO_REFERENCE_KEY)
+        const { imageDataUrl, name } = JSON.parse(raw) as { imageDataUrl: string, name?: string }
+        if (imageDataUrl) {
+          initial.push({ id: `scene-${Date.now().toString(36)}`, name: name || 'Scene', imageDataUrl, kind: 'scene' })
+          sceneHandoff = true
+        }
+      }
+    }
+    catch { /* malformed handoff — ignore */ }
+    // Only auto-attach a default character when no scene image came along.
+    const sheetId = state.characterId ?? (sceneHandoff ? undefined : characters[0]?.id)
+    const sheet = characters.find(item => item.id === sheetId)
+    if (sheet?.imageDataUrl)
+      initial.unshift({ id: sheet.id, name: sheet.name, imageDataUrl: sheet.imageDataUrl, sheet })
+    return initial
   })
   const [action, setAction] = useState(state.seedPrompt ?? '')
   const [isGenerating, setIsGenerating] = useState(false)
   const [current, setCurrent] = useState<{ dataUrl: string, interactionId: string | null, editsUsed: number } | null>(null)
   const [editText, setEditText] = useState('')
   const [gallery, setGallery] = useState<SavedVideo[]>([])
+  const [savedScenes, setSavedScenes] = useState<SavedScene[]>([])
   const [notice, setNotice] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
@@ -101,6 +123,7 @@ export default function Videos() {
 
   useEffect(() => {
     listMedia<SavedVideo>('videos').then(setGallery).catch(() => setGallery([]))
+    listMedia<SavedScene>('scenes').then(setSavedScenes).catch(() => setSavedScenes([]))
   }, [])
 
   const flash = (text: string, type: 'success' | 'error' = 'success') => {
@@ -113,10 +136,15 @@ export default function Videos() {
     const base = firstSheet
       ? compileVideoPrompt(firstSheet.data, action.trim())
       : `Cinematic video scene: ${action.trim()}`
-    const anchor = references.length
-      ? `\nPreserve the exact identity, appearance and styling of every subject shown in the ${references.length} attached reference image${references.length === 1 ? '' : 's'}.`
+    const subjectRefs = references.filter(reference => reference.kind !== 'scene')
+    const sceneRef = references.find(reference => reference.kind === 'scene')
+    const anchor = subjectRefs.length
+      ? `\nPreserve the exact identity, appearance and styling of every subject shown in the ${subjectRefs.length} attached character reference image${subjectRefs.length === 1 ? '' : 's'}.`
       : ''
-    return `${base}${anchor}\nDuration: approximately 8 seconds. Single continuous cinematic shot.`
+    const setting = sceneRef
+      ? `\nUse the attached scene image as the setting: match its location, lighting, color palette and mood throughout the shot.`
+      : ''
+    return `${base}${anchor}${setting}\nDuration: approximately 8 seconds. Single continuous cinematic shot.`
   }
 
   const callVideoApi = async (prompt: string, previousInteractionId: string | null) => {
@@ -210,7 +238,7 @@ export default function Videos() {
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.pickCharacter}</h2>
             {!characters.length && <p className="text-sm mb-3" style={{ color: 'var(--text-60)' }}>{t.noneSaved} <button className="bg-transparent border-none underline cursor-pointer font-bold p-0" style={{ color: 'var(--om-teal)' }} onClick={() => navigate('/create')}>{t.goCreate}</button></p>}
-            <ReferencePicker characters={characters} value={references} onChange={setReferences} lang={lang} />
+            <ReferencePicker characters={characters} scenes={savedScenes} value={references} onChange={setReferences} lang={lang} />
           </section>
 
           <section className="om-card">
@@ -272,7 +300,7 @@ export default function Videos() {
             <Video size={14} />{t.gallery}
           </h2>
           {!gallery.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[560px] overflow-y-auto pr-1">
             {gallery.map(video => (
               <div key={video.id} className="rounded-xl overflow-hidden" style={{ background: 'var(--highlight-bg)' }}>
                 <video src={video.videoDataUrl} controls className="w-full max-h-64" />

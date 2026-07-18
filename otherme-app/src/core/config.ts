@@ -26,7 +26,10 @@ configure({
   paypalEnabled: false,
 })
 
+/** One-time starter balance granted the first time an account's ledger is created. */
+export const WELCOME_CREDITS = 5
 export const FREE_SHEET_GENERATIONS = 5
+export const SHEET_RENDER_CREDITS = 1
 export const FREE_SCENE_GENERATIONS = 5
 export const AVATAR_SPRITE_CREDITS = 3
 export const SCENE_CREDITS = 5

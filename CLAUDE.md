@@ -51,6 +51,15 @@ Neither is needed on a clean network.
 - `POST /api/generate-avatar` — 3×2 talking-sprite sheet (chroma-green matte, client removes it) + roleplay personality via OpenAI
 - `POST /api/gemini-token` — ephemeral token so the browser can open Gemini Live directly (low latency voice)
 - `POST /api/generate-video` — `gemini-omni-flash-preview` via the **Interactions API** (requires `@google/genai` >= 2.x; video comes back as base64 mp4 inside `interaction.steps[].content`). `previousInteractionId` enables conversational edits; the client caps them at 3.
+- `POST /api/share` (raw bytes + `X-Filename` header) / `GET /api/share/:id` — temporary in-memory file share (30-min TTL) backing the WebView download fallback below.
+
+### Nimiq Pay WebView limitations (confirmed on-device)
+
+The wallet's Android WebView supports **no file downloads** (no download listener, no Web Share API) and **no microphone** (`getUserMedia` permission is not forwarded). Consequences baked into the code — don't undo them:
+
+- Every file export must go through `shareOrDownloadBlob` in `src/character/library.ts`: Web Share → WebView fallback (`POST /api/share` + copy-link overlay, opened in a real browser) → anchor download. WebView detection = `\bwv\b` in the user agent.
+- Gemini Live sessions survive mic failure (user types, avatar speaks) instead of tearing down.
+- localStorage is ~5 MB total: character sheet images are compressed to 1024px WebP before saving (`compressImageDataUrl`), avatar sprites are stored as WebP-with-alpha, and persist failures must be surfaced to the user (silent quota failure looks like "saved" but vanishes on reload).
 
 ### Client structure
 
@@ -61,9 +70,10 @@ Neither is needed on a clean network.
 
 ### Cross-module conventions
 
-- **Credits economy** (constants in `src/core/config.ts`): sheet renders 5 free then login; scenes 5 free then 5 credits; sprites 3; talking 1/min; videos 100. Spends go through the single shared `credits.spend()`; purchases are real wallet transactions (test prices ÷100 of production).
-- **Handoffs between modules** use `sessionStorage` (`otherme:pending-reference` landing→create, `otherme:avatar-reference` create→talk) or router state (`characterId`, `seedPrompt` for scenes/videos).
-- **Persistence** is local with explicit Firebase migration seams: character sheets in localStorage (`src/character/library.ts`), scene/video galleries in IndexedDB (`src/core/mediaStore.ts` — videos are too big for localStorage), custom avatars in localStorage (`src/roleplay/avatarLibrary.ts`).
+- **Credits economy** (constants in `src/core/config.ts`): sheet renders 5 free anonymous, then login → 5 welcome credits (granted once per new ledger in `loadCreditsFor`) → 1 credit/render; scenes 5 free then 5 credits; sprites 3; talking 1/min; videos 100. Spends go through the single shared `credits.spend()`; purchases are real wallet transactions (test prices ÷100 of production). On the Credits page NIM is the primary rail (never disabled waiting on the CoinGecko quote — `buyWithNim` fetches its own rate), USDT second with a Polygon-network warning.
+- **Handoffs between modules** use `sessionStorage` (`otherme:pending-reference` landing→create, `otherme:avatar-reference` create→talk, `otherme:video-reference` scene→video) or router state (`characterId`, `seedPrompt` for scenes/videos). `ReferencePicker` also takes a `scenes` prop (video creator): max 1 saved scene, injected into the prompt as the *setting*, not an identity subject.
+- **Voice defaults**: `/api/generate-avatar` returns `gender` (female/male/object) in the profile; the roleplay studio sets the default voice from it (Sulafat / Zubenelgenubi / Puck) on generation and on avatar selection.
+- **Persistence** is local with explicit Firebase migration seams: character sheets in localStorage (`src/character/library.ts`, images compressed to 1024px WebP on save), scene/video galleries in IndexedDB (`src/core/mediaStore.ts` — videos are too big for localStorage), custom avatars in localStorage (`src/roleplay/avatarLibrary.ts`, sprites stored as WebP-with-alpha; persist failures are shown to the user).
 - **Styling**: theme-aware CSS variables in `src/styles/global.css` (Nimiq tokens + OtherMe teal palette) consumed by Tailwind utility classes and `.om-*` classes; dark mode is `[data-theme='dark']` on `<html>` (Tailwind `darkMode: ['class', '[data-theme="dark"]']`). The roleplay studio keeps its own scoped stylesheet (`src/styles/roleplay.css`, `.rp-root` prefix) ported from Aeternum with a light-theme variable override.
 - Prompt templates (character sheet, video, style directives) live in `src/character/fields.ts` — the exact prompt text is a product feature; don't rewrite it casually.
 

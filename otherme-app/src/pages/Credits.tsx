@@ -22,6 +22,7 @@ const COPY = {
     approx: '≈',
     liveRate: 'live rate',
     fallbackRate: 'offline rate',
+    usdtNetwork: 'USDT requires the Polygon network — Nimiq Pay will ask you to switch if needed.',
     history: 'Purchases',
     empty: 'No purchases yet.',
     logout: 'Log out',
@@ -37,6 +38,7 @@ const COPY = {
     approx: '≈',
     liveRate: 'tasa en vivo',
     fallbackRate: 'tasa offline',
+    usdtNetwork: 'USDT requiere la red Polygon — Nimiq Pay te pedirá cambiar de red si es necesario.',
     history: 'Compras',
     empty: 'Aún no hay compras.',
     logout: 'Cerrar sesión',
@@ -123,18 +125,23 @@ export default function Credits() {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          <button className="om-button green w-full" disabled={isPaying} onClick={() => buyWithUsdt(selected)}>
-            {t.payUsdt} · {usdt.amount} USDT
-          </button>
-          <button className="om-button gold w-full" disabled={isPaying || !nimQuote} onClick={() => buyWithNim(selected)}>
+          {/* NIM is the primary rail: buyWithNim fetches its own rate, so the
+              button never waits on the display quote. */}
+          <button className="om-button gold w-full" disabled={isPaying} onClick={() => buyWithNim(selected)}>
             {t.payNim}
-            {nimQuote ? ` · ${t.approx} ${nimQuote.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} NIM` : ' · …'}
+            {nimQuote ? ` · ${t.approx} ${nimQuote.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} NIM` : ''}
           </button>
           {nimQuote && (
-            <p className="text-xs text-center" style={{ color: 'var(--text-40)' }}>
+            <p className="text-xs text-center m-0" style={{ color: 'var(--text-40)' }}>
               {t.nimCredits(nimQuote.credits)} ({nimQuote.rateIsLive ? t.liveRate : t.fallbackRate}) — {t.bonus}
             </p>
           )}
+          <button className="om-button green w-full" disabled={isPaying} onClick={() => buyWithUsdt(selected)}>
+            {t.payUsdt} · {usdt.amount} USDT
+          </button>
+          <p className="text-xs text-center m-0" style={{ color: 'var(--text-40)' }}>
+            {t.usdtNetwork}
+          </p>
         </div>
         {error && <div className="nq-notice error" role="alert">{error}</div>}
       </div>

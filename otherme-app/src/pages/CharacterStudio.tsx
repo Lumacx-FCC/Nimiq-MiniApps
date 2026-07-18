@@ -17,13 +17,15 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
-import { FREE_SHEET_GENERATIONS } from '../core/config'
+import { credits as creditsApi, useCredits } from '../core/credits'
+import { FREE_SHEET_GENERATIONS, SHEET_RENDER_CREDITS } from '../core/config'
 import AppHeader from '../components/AppHeader'
 import {
   CharacterSheet, DEFAULT_SHEET, PRESETS, RenderStyle, SECTIONS,
   compileSheetPrompt, compileVideoPrompt, styleDirective,
 } from '../character/fields'
-import { SavedSheet, deleteSheet, downloadDataUrl, downloadJson, listSheets, saveSheet } from '../character/library'
+import { SavedSheet, compressImageDataUrl, deleteSheet, downloadDataUrl, listSheets, saveSheet } from '../character/library'
+import Lightbox from '../components/Lightbox'
 
 const FREE_COUNT_KEY = 'otherme:free-generations'
 const PENDING_REFERENCE_KEY = 'otherme:pending-reference'
@@ -51,9 +53,10 @@ const COPY = {
     result: 'Your Character Sheet',
     save: 'Save',
     saved: 'Saved to your library',
-    saveFailed: 'Could not save (storage full). Download instead.',
+    saveFailed: 'This device’s app storage is full — delete an old character below, or use Image to save the sheet to your phone (you can re-upload it later as a reference).',
     downloadImg: 'Image',
-    downloadJson: 'JSON',
+    costPerRender: (balance: number) => `${SHEET_RENDER_CREDITS} credit per render · balance: ${balance}`,
+    insufficientCredits: 'Not enough credits — top up to keep rendering',
     talk: 'Talk with this character',
     library: 'My characters',
     empty: 'Nothing saved yet — generate a sheet and press Save.',
@@ -93,9 +96,10 @@ const COPY = {
     result: 'Tu Character Sheet',
     save: 'Guardar',
     saved: 'Guardado en tu biblioteca',
-    saveFailed: 'No se pudo guardar (almacenamiento lleno). Descárgalo.',
+    saveFailed: 'El almacenamiento de la app está lleno — elimina un personaje antiguo abajo, o usa Imagen para guardar la hoja en tu teléfono (puedes resubirla luego como referencia).',
     downloadImg: 'Imagen',
-    downloadJson: 'JSON',
+    costPerRender: (balance: number) => `${SHEET_RENDER_CREDITS} crédito por render · saldo: ${balance}`,
+    insufficientCredits: 'No tienes créditos suficientes — recarga para seguir renderizando',
     talk: 'Hablar con este personaje',
     library: 'Mis personajes',
     empty: 'Nada guardado aún — genera una hoja y presiona Guardar.',
@@ -130,6 +134,7 @@ export default function CharacterStudio() {
   const t = COPY[lang]
   const navigate = useNavigate()
   const { isLoggedIn } = useAuth()
+  const { balance } = useCredits()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [image, setImage] = useState<string | null>(() => sessionStorage.getItem(PENDING_REFERENCE_KEY))
@@ -148,6 +153,7 @@ export default function CharacterStudio() {
   const [copied, setCopied] = useState<'sheet' | 'video' | null>(null)
   const [freeUsed, setFreeUsed] = useState(readFreeCount)
   const [library, setLibrary] = useState<SavedSheet[]>(listSheets)
+  const [lightbox, setLightbox] = useState<{ src: string, alt: string } | null>(null)
 
   useEffect(() => {
     sessionStorage.removeItem(PENDING_REFERENCE_KEY)
@@ -209,6 +215,10 @@ export default function CharacterStudio() {
       navigate('/login', { state: { notice: t.freeOver, redirectTo: '/create' } })
       return
     }
+    if (isLoggedIn && creditsApi.balance < SHEET_RENDER_CREDITS) {
+      flash(t.insufficientCredits, 'error')
+      return
+    }
     setIsGenerating(true)
     setGeneratedImg(null)
     try {
@@ -231,6 +241,9 @@ export default function CharacterStudio() {
         const next = freeUsed + 1
         setFreeUsed(next)
         localStorage.setItem(FREE_COUNT_KEY, String(next))
+      }
+      else {
+        creditsApi.spend(SHEET_RENDER_CREDITS)
       }
     }
     catch (error) {
@@ -257,13 +270,14 @@ export default function CharacterStudio() {
     window.setTimeout(() => setCopied(null), 2000)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const sheet: SavedSheet = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       name: formData.name || 'Character',
       savedAt: new Date().toISOString(),
       data: formData,
-      imageDataUrl: generatedImg,
+      // Compressed copy for the library (localStorage budget); downloads keep full size.
+      imageDataUrl: generatedImg ? await compressImageDataUrl(generatedImg) : null,
     }
     if (saveSheet(sheet)) {
       setLibrary(listSheets())
@@ -429,27 +443,35 @@ export default function CharacterStudio() {
               {isGenerating ? <RefreshCw size={17} className="animate-spin" /> : <Wand2 size={17} />}
               {isGenerating ? t.generating : canGenerate ? t.generate : t.loginToContinue}
             </button>
-            {!isLoggedIn && (
-              <p className="text-xs text-center mt-2 font-bold" style={{ color: freeLeft > 0 ? 'var(--om-teal)' : 'var(--nimiq-red)' }}>
-                {freeLeft > 0 ? t.freeLeft(freeLeft) : t.freeOver}
-              </p>
-            )}
+            {!isLoggedIn
+              ? (
+                  <p className="text-xs text-center mt-2 font-bold" style={{ color: freeLeft > 0 ? 'var(--om-teal)' : 'var(--nimiq-red)' }}>
+                    {freeLeft > 0 ? t.freeLeft(freeLeft) : t.freeOver}
+                  </p>
+                )
+              : (
+                  <p className="text-xs text-center mt-2 font-bold" style={{ color: balance >= SHEET_RENDER_CREDITS ? 'var(--om-teal)' : 'var(--nimiq-red)' }}>
+                    {t.costPerRender(balance)}
+                  </p>
+                )}
           </section>
           )}
 
           {generatedImg && (
             <section className="om-card">
               <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.result}</h2>
-              <img src={generatedImg} alt={`Character sheet: ${formData.name}`} className="w-full h-auto rounded-xl shadow-lg" />
+              <img
+                src={generatedImg}
+                alt={`Character sheet: ${formData.name}`}
+                className="w-full h-auto rounded-xl shadow-lg cursor-zoom-in"
+                onClick={() => setLightbox({ src: generatedImg, alt: formData.name || 'Character sheet' })}
+              />
               <div className="flex gap-2 mt-3 flex-wrap">
-                <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={handleSave}>
+                <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={() => void handleSave()}>
                   <Save size={15} />{t.save}
                 </button>
                 <button className="icon-chip" onClick={() => downloadDataUrl(generatedImg, `${formData.name.replace(/\s+/g, '-')}-sheet.webp`)}>
                   <Download size={14} />{t.downloadImg}
-                </button>
-                <button className="icon-chip" onClick={() => downloadJson({ ...formData, prompt: compiledPrompt }, `${formData.name.replace(/\s+/g, '-')}-sheet.json`)}>
-                  <Download size={14} />{t.downloadJson}
                 </button>
               </div>
               <button className="om-button blue w-full mt-2 !min-h-[42px] !text-sm" onClick={() => talkWith(generatedImg, formData.name)}>
@@ -462,11 +484,11 @@ export default function CharacterStudio() {
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.library}</h2>
             {!library.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
               {library.map(sheet => (
                 <div key={sheet.id} className="flex items-center gap-3 p-2 rounded-xl" style={{ background: 'var(--highlight-bg)' }}>
                   {sheet.imageDataUrl
-                    ? <img src={sheet.imageDataUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                    ? <img src={sheet.imageDataUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 cursor-zoom-in" onClick={() => setLightbox({ src: sheet.imageDataUrl!, alt: sheet.name })} />
                     : <span className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--nq-card)' }}><Sparkles size={16} style={{ color: 'var(--om-teal)' }} /></span>}
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-sm truncate m-0">{sheet.name}</p>
@@ -531,6 +553,8 @@ export default function CharacterStudio() {
           )}
         </div>
       </div>
+
+      {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
 
       {notice && (
         <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
