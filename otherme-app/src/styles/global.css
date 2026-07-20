@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — Nimiq UI kit values (shared with core-modules) plus the
+ * Other Me landing palette (soft sky gradient, teal accents from branding).
+ */
+:root {
+  --nimiq-blue: #1f2348;
+  --nimiq-light-blue: #0582ca;
+  --nimiq-gold: #e9b213;
+  --nimiq-green: #21bca5;
+  --nimiq-red: #d94432;
+  --usdt-green: #009393;
+
+  --nimiq-light-blue-bg: radial-gradient(100% 100% at bottom right, #265dd7, var(--nimiq-light-blue));
+  --nimiq-gold-bg: radial-gradient(100% 100% at bottom right, #ec991c, var(--nimiq-gold));
+  --nimiq-green-bg: radial-gradient(100% 100% at bottom right, #41a38e, var(--nimiq-green));
+
+  /* Other Me brand */
+  --om-teal: #2ea3b4;
+  --om-teal-deep: #12798c;
+  --om-sky: #eaf3fb;
+  --om-cta-bg: linear-gradient(135deg, #6fc7d6, #2ea3b4);
+
+  /* Surfaces & text (light) */
+  --nq-bg: var(--om-sky);
+  --page-gradient: linear-gradient(160deg, #f2f8fd 0%, #dcebf7 55%, #cfe4f4 100%);
+  --nq-card: #ffffff;
+  --card-gradient: linear-gradient(165deg, #ffffff 0%, #f2f9fc 70%, #dff0f7 100%);
+  --text-100: rgba(31, 35, 72, 1);
+  --text-70: rgba(31, 35, 72, 0.7);
+  --text-60: rgba(31, 35, 72, 0.6);
+  --text-40: rgba(31, 35, 72, 0.4);
+  --highlight-bg: rgba(31, 35, 72, 0.06);
+
+  --radius-card: 18px;
+  --radius-button: 500px;
+  --nq-shadow: 0 8px 30px rgba(31, 35, 72, 0.10);
+  --nimiq-ease: cubic-bezier(0.25, 0, 0, 1);
+}
+
+:root[data-theme='dark'] {
+  --nq-bg: #151833;
+  --page-gradient: linear-gradient(160deg, #141731 0%, #171b3a 55%, #10132b 100%);
+  --nq-card: #1f2348;
+  --card-gradient: linear-gradient(165deg, #23284f 0%, #1f2348 70%, #1a1e40 100%);
+  --text-100: rgba(255, 255, 255, 0.95);
+  --text-70: rgba(255, 255, 255, 0.7);
+  --text-60: rgba(255, 255, 255, 0.6);
+  --text-40: rgba(255, 255, 255, 0.4);
+  --highlight-bg: rgba(255, 255, 255, 0.1);
+  --nimiq-light-blue: #0ca6fe;
+  --nq-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --om-sky: #151833;
+  --card-gradient-strong: linear-gradient(165deg, #262b57 0%, #1f2348 100%);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Muli', 'Mulish', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--page-gradient);
+  background-attachment: fixed;
+  color: var(--text-100);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.4s var(--nimiq-ease), color 0.4s var(--nimiq-ease);
+}
+
+.page-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  min-height: 100vh;
+}
+
+.page-shell.wide { max-width: 1100px; }
+
+.om-card {
+  background: var(--card-gradient);
+  border-radius: var(--radius-card);
+  box-shadow: var(--nq-shadow);
+  padding: 24px;
+  transition: background 0.4s var(--nimiq-ease);
+}
+
+.om-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: var(--radius-button);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--om-cta-bg);
+  box-shadow: 0 6px 18px rgba(46, 163, 180, 0.35);
+  cursor: pointer;
+  transition: opacity 0.2s var(--nimiq-ease), transform 0.2s cubic-bezier(0.41, 0.34, 0.26, 1.55);
+}
+.om-button:active { transform: scale(0.97); }
+.om-button:disabled { opacity: 0.45; cursor: default; }
+.om-button.blue { background: var(--nimiq-light-blue-bg); box-shadow: 0 6px 18px rgba(5, 130, 202, 0.3); }
+.om-button.green { background: var(--nimiq-green-bg); box-shadow: 0 6px 18px rgba(33, 188, 165, 0.3); }
+.om-button.gold { background: var(--nimiq-gold-bg); box-shadow: 0 6px 18px rgba(233, 178, 19, 0.3); }
+.om-button.secondary { background: var(--highlight-bg); color: var(--text-100); box-shadow: none; }
+
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  min-width: 42px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-button);
+  background: var(--highlight-bg);
+  color: var(--text-100);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nq-notice {
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  margin-top: 12px;
+}
+.nq-notice.error { background: rgba(217, 68, 50, 0.12); color: var(--nimiq-red); }
+.nq-notice.info { background: rgba(5, 130, 202, 0.08); color: var(--nimiq-light-blue); }
+.nq-notice.success { background: rgba(33, 188, 165, 0.12); color: var(--nimiq-green); }
+:root[data-theme='dark'] .nq-notice.error { color: #ff5c48; }
+
+/* Sprite-sheet thumbnail (3x2 grid, show first frame) */
+.sprite-thumb {
+  background-size: 300% 200%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+.float-slow { animation: float-slow 5s ease-in-out infinite; }
+
+@keyframes scan {
+  0% { top: 0; }
+  100% { top: 100%; }
+}

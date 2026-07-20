@@ -1,0 +1,315 @@
+/*
+ * Roleplay studio styles — ported from Aeternum (globals.css) and scoped to
+ * .rp-root. Palette variables live on .rp-root so the module follows the
+ * app-wide light/dark toggle: dark keeps the original cinematic look, light
+ * swaps shell surfaces while the stage stays scene-driven.
+ */
+.rp-root {
+  --ink: #06090a;
+  --panel: #0d1213;
+  --panel-2: #111819;
+  --line: rgba(203, 226, 220, 0.12);
+  --line-strong: rgba(46, 163, 180, 0.38);
+  --text: #edf5f2;
+  --muted: #8ea09c;
+  --emerald: #69e5c1;
+  --emerald-2: #1aa980;
+  --gold: #d5b871;
+  --danger: #ef776c;
+  --shell-bg:
+    radial-gradient(circle at 48% -10%, rgba(48, 133, 113, .17), transparent 36rem),
+    linear-gradient(145deg, #070a0b 0%, #0a0f10 50%, #07090a 100%);
+  --surface-veil: rgba(6, 9, 10, .86);
+  --rail-veil: rgba(8, 12, 13, .78);
+  --panel-veil: rgba(14, 20, 21, .74);
+  --chip-bg: rgba(255, 255, 255, .035);
+  --input-bg: rgba(4, 7, 8, .72);
+
+  color: var(--text);
+  font-family: 'Muli', 'Mulish', Arial, Helvetica, sans-serif;
+}
+
+:root[data-theme='light'] .rp-root {
+  --ink: #eef5f7;
+  --panel: #ffffff;
+  --panel-2: #f2f8fa;
+  --line: rgba(31, 35, 72, 0.12);
+  --line-strong: rgba(46, 163, 180, 0.5);
+  --text: #1f2348;
+  --muted: #5c6a83;
+  --emerald: #12798c;
+  --emerald-2: #2ea3b4;
+  --gold: #a8842a;
+  --shell-bg:
+    radial-gradient(circle at 48% -10%, rgba(46, 163, 180, .14), transparent 36rem),
+    linear-gradient(145deg, #f2f8fd 0%, #e2eff8 50%, #d5e8f4 100%);
+  --surface-veil: rgba(255, 255, 255, .8);
+  --rail-veil: rgba(255, 255, 255, .72);
+  --panel-veil: rgba(255, 255, 255, .78);
+  --chip-bg: rgba(31, 35, 72, .05);
+  --input-bg: rgba(31, 35, 72, .05);
+}
+
+.rp-root { position: relative; min-height: 100vh; background: var(--shell-bg); overflow: hidden; }
+.rp-root button, .rp-root input, .rp-root select { font: inherit; }
+.rp-root button { color: inherit; }
+
+.rp-root .ambient-orb { position: fixed; border-radius: 999px; filter: blur(90px); opacity: .16; pointer-events: none; }
+.rp-root .orb-one { width: 34rem; height: 34rem; background: #1fc697; top: 20%; left: 27%; }
+.rp-root .orb-two { width: 22rem; height: 22rem; background: #967838; bottom: -10%; right: 8%; opacity: .1; }
+
+.rp-root .topbar {
+  height: 72px; padding: 0 22px; display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  border-bottom: 1px solid var(--line); background: var(--surface-veil); backdrop-filter: blur(24px); position: relative; z-index: 20;
+}
+.rp-root .brand-lockup { display: flex; align-items: center; gap: 11px; text-decoration: none; color: inherit; }
+.rp-root .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; overflow: hidden; }
+.rp-root .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+.rp-root .brand-lockup strong { display: block; font-family: Georgia, "Times New Roman", serif; letter-spacing: .2em; font-size: 15px; font-weight: 500; }
+.rp-root .brand-lockup span { display: block; color: var(--muted); letter-spacing: .18em; font-size: 8px; margin-top: 3px; }
+.rp-root .topbar-actions { display: flex; align-items: center; gap: 10px; }
+.rp-root .credits-pill, .rp-root .usage-pill, .rp-root .language-button, .rp-root .topbar-utility-button {
+  height: 36px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip-bg); display: flex; align-items: center; gap: 7px; padding: 0 13px; color: var(--muted); font-size: 12px;
+}
+.rp-root .credits-pill { cursor: pointer; text-decoration: none; }
+.rp-root .credits-pill svg { color: var(--gold); }
+.rp-root .credits-pill strong { color: var(--text); font-size: 13px; }
+.rp-root .credits-pill span { font-size: 10px; }
+.rp-root .usage-pill { gap: 8px; font-size: 9px; white-space: nowrap; }
+.rp-root .usage-pill strong { color: var(--text); font-size: 11px; letter-spacing: .03em; }
+.rp-root .usage-pill i { width: 1px; height: 13px; background: var(--line); }
+.rp-root .language-button { cursor: pointer; transition: .2s; }
+.rp-root .language-button:hover { border-color: var(--line-strong); color: var(--emerald); }
+.rp-root .topbar-utility-button { cursor: pointer; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
+.rp-root .topbar-utility-button:hover { border-color: var(--line-strong); color: var(--emerald); }
+.rp-root .topbar-utility-button.login-button { color: var(--gold); border-color: rgba(213,184,113,.25); }
+.rp-root .topbar-utility-button.login-button.logged-in { color: var(--emerald); border-color: var(--line-strong); cursor: default; }
+.rp-root .icon-button { border: 0; background: transparent; padding: 5px; display: grid; place-items: center; cursor: pointer; }
+.rp-root .mobile-menu, .rp-root .close-rail { display: none; }
+
+.rp-root .workspace-grid {
+  /* No z-index here: it would trap the fixed mobile rail (z 60) below the scrim (z 50). */
+  height: calc(100vh - 72px); position: relative; display: grid;
+  grid-template-columns: 248px minmax(470px, 1fr) 356px; max-width: 1840px; margin: 0 auto;
+}
+
+.rp-root .character-rail { padding: 18px 14px 14px; border-right: 1px solid var(--line); background: var(--rail-veil); min-height: 0; display: flex; flex-direction: column; backdrop-filter: blur(18px); }
+.rp-root .rail-heading { padding: 0 7px 12px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); text-transform: uppercase; letter-spacing: .16em; font-size: 10px; }
+.rp-root .avatar-list { overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
+.rp-root .avatar-card { width: 100%; min-height: 59px; border: 1px solid transparent; border-radius: 11px; background: transparent; padding: 7px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer; transition: .18s ease; }
+.rp-root .avatar-card:hover { background: var(--chip-bg); border-color: var(--line); }
+.rp-root .avatar-card.active { background: linear-gradient(100deg, rgba(46,163,180,.14), var(--chip-bg)); border-color: var(--line-strong); box-shadow: inset 3px 0 var(--emerald-2); }
+.rp-root .avatar-card > svg { margin-left: auto; color: var(--emerald); }
+.rp-root .avatar-thumb { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 8px; background-color: #050707; background-repeat: no-repeat; border: 1px solid var(--line); box-shadow: 0 5px 18px rgba(0,0,0,.25); }
+.rp-root .avatar-meta { min-width: 0; flex: 1; }
+.rp-root .avatar-meta strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: Georgia, "Times New Roman", serif; font-size: 13px; font-weight: 500; }
+.rp-root .avatar-meta small { display: block; color: var(--muted); font-size: 9px; margin-top: 4px; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-root .rail-section-label { margin: 18px 7px 8px; color: var(--muted); text-transform: uppercase; font-size: 8px; letter-spacing: .13em; }
+.rp-root .empty-card { border-style: dashed; border-color: var(--line); }
+.rp-root .locked-slot { opacity: .52; cursor: not-allowed; }
+.rp-root .locked-slot:hover { background: transparent; border-color: var(--line); }
+.rp-root .empty-avatar { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 8px; border: 1px dashed var(--line-strong); color: var(--emerald); background: var(--chip-bg); }
+.rp-root .custom-card { padding: 5px; position: relative; }
+.rp-root .custom-select { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; border: 0; background: none; color: inherit; text-align: left; padding: 2px; cursor: pointer; }
+.rp-root .remove-button, .rp-root .download-button { opacity: 0; width: 27px; height: 27px; border: 0; border-radius: 7px; display: grid; place-items: center; cursor: pointer; transition: .15s; }
+.rp-root .remove-button { background: rgba(239,119,108,.12); color: var(--danger); }
+.rp-root .download-button { background: rgba(46,163,180,.12); color: var(--emerald); }
+.rp-root .custom-card:hover .remove-button, .rp-root .custom-card:hover .download-button { opacity: 1; }
+.rp-root .login-unlock-card { width: 100%; flex: 0 0 auto; border: 1px solid var(--line-strong); background: rgba(46,163,180,.08); border-radius: 11px; padding: 11px; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text); cursor: pointer; text-align: center; font-size: 10px; }
+.rp-root .login-unlock-card:hover { background: rgba(46,163,180,.14); }
+.rp-root .unlock-card { flex: 0 0 auto; border: 1px solid rgba(213,184,113,.25); background: linear-gradient(135deg, rgba(213,184,113,.1), rgba(213,184,113,.02)); border-radius: 11px; padding: 11px; margin-top: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left; }
+.rp-root .unlock-card > span { width: 31px; height: 31px; border-radius: 8px; display: grid; place-items: center; color: var(--gold); background: rgba(213,184,113,.1); }
+.rp-root .unlock-card strong { display: block; font-size: 11px; font-weight: 600; }
+.rp-root .unlock-card small { display: block; color: var(--muted); font-size: 9px; margin-top: 3px; }
+
+.rp-root .stage-column { padding: 15px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.rp-root .stage-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
+.rp-root .stage-nav-actions, .rp-root .stage-selectors { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rp-root .toolbar-nav-button { height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-veil); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; text-decoration: none; text-transform: uppercase; letter-spacing: .08em; font-size: 8px; white-space: nowrap; cursor: pointer; transition: .18s ease; }
+.rp-root .toolbar-nav-button:hover { border-color: var(--line-strong); color: var(--emerald); }
+.rp-root .widget-button { color: var(--gold); border-color: rgba(213,184,113,.25); }
+.rp-root .widget-button.saved { color: var(--emerald); border-color: var(--line-strong); }
+.rp-root .stage-toolbar label { position: relative; height: 34px; min-width: 142px; display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-veil); overflow: hidden; }
+.rp-root .stage-toolbar label > span { display: flex; align-items: center; gap: 5px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; font-size: 8px; padding-left: 10px; pointer-events: none; }
+.rp-root .stage-toolbar select { flex: 1; appearance: none; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 10px; padding: 0 22px 0 8px; cursor: pointer; }
+.rp-root .stage-toolbar select option { background: var(--panel); color: var(--text); }
+.rp-root .stage-toolbar label > svg { position: absolute; right: 7px; pointer-events: none; color: var(--muted); }
+
+.rp-root .character-stage { position: relative; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background-size: cover; background-position: center; box-shadow: 0 30px 70px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.02); container-type: inline-size; }
+.rp-root .character-stage::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 25%, rgba(2,4,5,.18) 64%, rgba(2,4,5,.62) 100%); pointer-events: none; z-index: 2; }
+.rp-root .stage-vignette { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(2,4,5,.16), transparent 50%, rgba(2,4,5,.72)); }
+.rp-root .live-status { position: absolute; top: 15px; left: 16px; z-index: 5; height: 29px; padding: 0 10px; display: flex; align-items: center; gap: 7px; border-radius: 999px; background: rgba(4,8,9,.58); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(12px); color: #b7c5c1; text-transform: uppercase; letter-spacing: .1em; font-size: 8px; }
+.rp-root .live-status > span { width: 6px; height: 6px; border-radius: 50%; background: #71817d; }
+.rp-root .live-status > span.listening { background: #69e5c1; box-shadow: 0 0 10px #69e5c1; animation: rp-pulse 1.5s infinite; }
+.rp-root .live-status > span.speaking { background: #d5b871; box-shadow: 0 0 10px #d5b871; animation: rp-pulse .7s infinite; }
+.rp-root .live-status > span.connecting { border: 1px solid #69e5c1; border-top-color: transparent; animation: rp-spin .8s linear infinite; background: transparent; }
+/* Keep the avatar visually proportional on every screen. Height is the single
+   governing dimension (width:auto + aspect-ratio derives a perfect square):
+   - Target/max: the smaller of 75% stage height and 65% stage width
+     -> min(75%, 65cqw). The box never exceeds these caps.
+   - Minimum: never smaller than the larger of 60% stage height and 55% stage
+     width -> max(60%, 55cqw). Because the avatar is square, on a very tall or
+     very wide stage that floor is bounded to 95% of the stage's smaller side
+     (95%, 95cqw) so it can't spill past the edges — there the min can't be
+     fully met. cqw/cqh-free: cqw resolves against .character-stage's width. */
+.rp-root .sprite-shell { position: absolute; z-index: 2; height: max(min(75%, 65cqw), min(max(60%, 55cqw), 95%, 95cqw)); width: auto; aspect-ratio: 1 / 1; left: 50%; bottom: 0; transform: translateX(-50%); filter: drop-shadow(0 22px 22px rgba(0,0,0,.48)); transition: filter .2s; }
+.rp-root .sprite-shell.is-speaking { filter: drop-shadow(0 22px 22px rgba(0,0,0,.48)) drop-shadow(0 0 18px rgba(105,229,193,.11)); }
+.rp-root .sprite-frame { width: 100%; height: 100%; background-repeat: no-repeat; }
+.rp-root .character-caption { position: absolute; z-index: 5; left: 22px; right: 185px; bottom: 20px; display: flex; align-items: flex-end; gap: 18px; pointer-events: none; }
+.rp-root .character-caption span { color: #69e5c1; text-transform: uppercase; letter-spacing: .25em; font-size: 8px; }
+.rp-root .character-caption h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: clamp(22px, 3vw, 38px); line-height: 1; margin: 6px 0 0; color: #edf5f2; text-shadow: 0 2px 18px rgba(0,0,0,.9); }
+.rp-root .live-button { position: absolute; z-index: 6; right: 20px; bottom: 20px; height: 46px; border-radius: 999px; border: 1px solid rgba(105,229,193,.42); background: linear-gradient(135deg, rgba(66,216,174,.96), rgba(24,150,116,.96)); color: #02120e; padding: 0 19px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; font-weight: 700; cursor: pointer; box-shadow: 0 10px 30px rgba(18,132,101,.28); transition: .2s; }
+.rp-root .live-button:hover { transform: translateY(-1px); }
+.rp-root .live-button.active { color: #f5d8d5; background: rgba(92,24,25,.84); border-color: rgba(239,119,108,.45); }
+.rp-root .live-button:disabled { opacity: .7; cursor: wait; }
+
+.rp-root .change-avatar-button { position: absolute; z-index: 6; right: 20px; bottom: 78px; height: 42px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); background: rgba(4,8,9,.62); color: var(--text); padding: 0 17px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; font-weight: 700; cursor: pointer; backdrop-filter: blur(12px); transition: .2s; }
+.rp-root .change-avatar-button:hover { border-color: var(--line-strong); color: var(--emerald); transform: translateY(-1px); }
+
+.rp-root .character-rail.glow { animation: rp-railPulse 1.25s ease-in-out 2; }
+@keyframes rp-railPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(66,216,174,.55), 0 0 26px rgba(66,216,174,.3); }
+  50% { box-shadow: 0 0 0 3px rgba(66,216,174,.95), 0 0 58px rgba(66,216,174,.55); }
+}
+
+.rp-root .coming-soon-flag { display: inline-flex; align-items: center; gap: 6px; margin: -4px 0 11px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(213,184,113,.28); background: rgba(213,184,113,.08); color: var(--gold); font-size: 9px; font-weight: 600; letter-spacing: .04em; }
+.rp-root .coming-soon-flag svg { color: var(--gold); }
+
+.rp-root .conversation-panel { min-height: 0; border-left: 1px solid var(--line); background: var(--rail-veil); backdrop-filter: blur(18px); padding: 15px; display: grid; grid-template-rows: auto auto minmax(0,1fr); gap: 12px; }
+.rp-root .voice-section, .rp-root .character-background-section, .rp-root .chat-section { border: 1px solid var(--line); background: var(--panel-veil); border-radius: 13px; padding: 13px; }
+.rp-root .panel-title { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 12px; }
+.rp-root .panel-title > span:first-child { display: flex; align-items: center; gap: 7px; }
+.rp-root .panel-title svg { color: var(--emerald); }
+.rp-root .panel-title > small { font-size: 7px; letter-spacing: .08em; }
+.rp-root .voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rp-root .voice-option { min-height: 45px; border: 1px solid var(--line); border-radius: 8px; background: var(--chip-bg); padding: 7px 8px; display: flex; align-items: center; gap: 7px; text-align: left; cursor: pointer; transition: .15s; }
+.rp-root .voice-option.active { border-color: var(--line-strong); background: rgba(46,163,180,.1); }
+.rp-root .voice-option > span:nth-child(2) { min-width: 0; flex: 1; }
+.rp-root .voice-option strong { display: block; font-size: 9px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.rp-root .voice-option small { display: block; color: var(--muted); font-size: 7px; margin-top: 3px; }
+.rp-root .voice-option > svg { color: var(--emerald); }
+.rp-root .gender-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+.rp-root .gender-dot.male { background: #70a9de; }
+.rp-root .gender-dot.female { background: #d993c7; }
+.rp-root .preview-button { width: 100%; min-height: 34px; margin-top: 8px; padding: 7px 10px; border: 1px solid rgba(213,184,113,.25); background: rgba(213,184,113,.06); border-radius: 8px; display: flex; align-items: center; gap: 7px; color: var(--gold); font-size: 9px; cursor: pointer; }
+.rp-root .preview-button small { color: var(--muted); margin-left: auto; font-size: 7px; max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-root .character-background-section p { margin: 0; color: var(--text); opacity: .8; font-family: Georgia, "Times New Roman", serif; font-size: 11px; line-height: 1.5; }
+
+.rp-root .chat-section { min-height: 0; display: flex; flex-direction: column; }
+.rp-root .secure-label { color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; font-size: 7px; }
+.rp-root .message-list { flex: 1; min-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px 3px 10px; scrollbar-width: thin; }
+.rp-root .empty-conversation { margin: auto; text-align: center; max-width: 235px; color: var(--muted); }
+.rp-root .empty-conversation > div { width: 46px; height: 46px; margin: 0 auto 11px; border-radius: 50%; display: grid; place-items: center; color: var(--emerald); background: rgba(46,163,180,.07); border: 1px solid var(--line); }
+.rp-root .empty-conversation p { font-family: Georgia, "Times New Roman", serif; font-size: 12px; line-height: 1.5; margin: 0; }
+.rp-root .empty-conversation small { display: block; margin-top: 8px; line-height: 1.4; font-size: 8px; }
+.rp-root .message { max-width: 88%; padding: 9px 10px; border-radius: 10px; }
+.rp-root .message > span { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: 7px; margin-bottom: 4px; }
+.rp-root .message p { margin: 0; font-family: Georgia, "Times New Roman", serif; line-height: 1.45; font-size: 11px; }
+.rp-root .message.user { align-self: flex-end; background: rgba(46,163,180,.1); border: 1px solid var(--line-strong); }
+.rp-root .message.avatar { align-self: flex-start; background: var(--chip-bg); border: 1px solid var(--line); }
+.rp-root .message.avatar > span { color: var(--emerald); }
+.rp-root .chat-input { min-height: 42px; display: flex; align-items: center; gap: 6px; padding: 5px 5px 5px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--input-bg); }
+.rp-root .chat-input:focus-within { border-color: var(--line-strong); }
+.rp-root .chat-input input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 10px; }
+.rp-root .chat-input input::placeholder { color: var(--muted); }
+.rp-root .chat-input button { width: 31px; height: 31px; border: 0; border-radius: 8px; display: grid; place-items: center; color: #062019; background: var(--emerald); cursor: pointer; }
+
+.rp-root .modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(2,4,5,.7); backdrop-filter: blur(14px); animation: rp-fadeIn .2s ease; }
+.rp-root .upload-modal { width: min(480px, 100%); position: relative; border: 1px solid var(--line-strong); border-radius: 18px; padding: 28px; background: var(--panel); box-shadow: 0 34px 100px rgba(0,0,0,.5); max-height: 90vh; overflow-y: auto; }
+.rp-root .modal-close { position: absolute; right: 14px; top: 14px; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--chip-bg); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.rp-root .modal-icon { width: 52px; height: 52px; margin-bottom: 17px; border-radius: 13px; display: grid; place-items: center; color: var(--emerald); background: rgba(46,163,180,.1); border: 1px solid var(--line-strong); }
+.rp-root .eyebrow { color: var(--emerald); letter-spacing: .18em; font-size: 8px; margin: 0 0 7px; }
+.rp-root .upload-modal h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 27px; }
+.rp-root .modal-help { color: var(--muted); font-size: 10px; line-height: 1.55; margin: 10px 0 20px; }
+.rp-root .field-label > span { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: 8px; margin-bottom: 7px; }
+.rp-root .field-label input { width: 100%; height: 41px; border: 1px solid var(--line); border-radius: 9px; outline: 0; background: var(--input-bg); color: var(--text); padding: 0 12px; font-size: 11px; }
+.rp-root .field-label input:focus { border-color: var(--line-strong); }
+.rp-root .subject-picker { margin-top: 14px; }
+.rp-root .subject-picker > span { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: 8px; margin-bottom: 7px; }
+.rp-root .subject-picker > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rp-root .subject-picker button { min-height: 58px; border: 1px solid var(--line); border-radius: 10px; background: var(--chip-bg); color: var(--muted); padding: 8px 9px; display: grid; grid-template-columns: 20px 1fr; grid-template-rows: auto auto; column-gap: 7px; align-items: center; text-align: left; cursor: pointer; transition: .18s ease; }
+.rp-root .subject-picker button svg { grid-row: 1 / span 2; }
+.rp-root .subject-picker button b { font-size: 10px; font-weight: 600; color: var(--text); }
+.rp-root .subject-picker button small { font-size: 8px; margin-top: 2px; }
+.rp-root .subject-picker button.active { border-color: var(--line-strong); background: rgba(46,163,180,.1); }
+.rp-root .subject-picker button.active svg { color: var(--emerald); }
+.rp-root .subject-picker button:disabled { opacity: .55; cursor: wait; }
+.rp-root .drop-zone { min-height: 124px; margin-top: 13px; border: 1px dashed var(--line-strong); border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: var(--muted); background: rgba(46,163,180,.04); cursor: pointer; transition: .18s; }
+.rp-root .drop-zone:hover { background: rgba(46,163,180,.08); }
+.rp-root .drop-zone input { display: none; }
+.rp-root .drop-zone strong { color: var(--text); font-size: 10px; font-weight: 600; max-width: 90%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rp-root .drop-zone small { font-size: 8px; }
+.rp-root .drop-zone.has-file svg { color: var(--emerald); }
+.rp-root .generation-progress { margin-top: 14px; }
+.rp-root .generation-progress > span { display: block; height: 3px; background: var(--chip-bg); border-radius: 99px; overflow: hidden; }
+.rp-root .generation-progress i { display: block; height: 100%; width: 34%; background: linear-gradient(90deg, transparent, var(--emerald), transparent); animation: rp-progress 1.4s ease-in-out infinite; }
+.rp-root .generation-progress p { color: var(--muted); font-size: 9px; text-align: center; margin: 8px 0 0; }
+.rp-root .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 19px; }
+.rp-root .secondary-button, .rp-root .primary-button { height: 39px; border-radius: 9px; padding: 0 14px; display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; font-size: 10px; font-weight: 600; }
+.rp-root .secondary-button { border: 1px solid var(--line); background: var(--chip-bg); color: var(--muted); }
+.rp-root .primary-button { border: 1px solid rgba(105,229,193,.25); background: linear-gradient(135deg, #66dfbd, #1b9c78); color: #04140f; }
+.rp-root .primary-button:disabled, .rp-root .secondary-button:disabled { opacity: .45; cursor: not-allowed; }
+.rp-root .toast { position: fixed; z-index: 120; left: 50%; bottom: 22px; transform: translateX(-50%); max-width: min(600px, calc(100vw - 28px)); min-height: 42px; padding: 10px 15px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--panel); backdrop-filter: blur(18px); box-shadow: 0 16px 50px rgba(0,0,0,.35); display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 10px; animation: rp-toastIn .25s ease; }
+.rp-root .toast svg { color: var(--emerald); flex: 0 0 auto; }
+.rp-root .mobile-scrim { display: none; }
+.rp-root .spin { animation: rp-spin .9s linear infinite; }
+
+@keyframes rp-pulse { 50% { opacity: .45; transform: scale(.75); } }
+@keyframes rp-spin { to { transform: rotate(360deg); } }
+@keyframes rp-fadeIn { from { opacity: 0; } }
+@keyframes rp-toastIn { from { opacity: 0; transform: translate(-50%, 10px); } }
+@keyframes rp-progress { 0% { transform: translateX(-110%); } 100% { transform: translateX(310%); } }
+
+@media (max-width: 1180px) {
+  .rp-root .workspace-grid { grid-template-columns: 220px minmax(420px, 1fr) 320px; }
+  .rp-root .conversation-panel { padding: 11px; }
+  .rp-root .voice-section, .rp-root .character-background-section, .rp-root .chat-section { padding: 11px; }
+}
+
+@media (max-width: 930px) {
+  .rp-root .workspace-grid { height: auto; min-height: calc(100vh - 64px); grid-template-columns: minmax(0,1fr) 330px; }
+  .rp-root .topbar { height: 64px; padding: 0 14px; }
+  .rp-root .character-rail { position: fixed; z-index: 60; top: 0; left: 0; bottom: 0; width: 270px; transform: translateX(-102%); transition: .25s ease; border-right: 1px solid var(--line-strong); background: var(--panel); box-shadow: 20px 0 60px rgba(0,0,0,.4); }
+  .rp-root .character-rail.open { transform: none; }
+  .rp-root .mobile-menu, .rp-root .close-rail { display: grid; }
+  .rp-root .mobile-scrim { display: block; position: fixed; z-index: 50; inset: 0; background: rgba(0,0,0,.58); }
+  .rp-root .stage-column { min-height: calc(100vh - 64px); }
+  .rp-root .conversation-panel { min-height: calc(100vh - 64px); }
+  .rp-root .stage-toolbar { align-items: flex-start; flex-direction: column; }
+  .rp-root .stage-selectors { align-self: stretch; justify-content: flex-end; }
+}
+
+@media (max-width: 720px) {
+  .rp-root { overflow-y: auto; }
+  .rp-root .brand-lockup strong { font-size: 13px; }
+  .rp-root .brand-lockup span { display: none; }
+  .rp-root .credits-pill span { display: none; }
+  .rp-root .topbar-actions { gap: 6px; }
+  .rp-root .topbar-utility-button { width: 32px; padding: 0; font-size: 0; }
+  .rp-root .topbar-utility-button svg { width: 15px; height: 15px; }
+  .rp-root .usage-pill { height: 32px; padding: 0 9px; gap: 5px; font-size: 8px; }
+  .rp-root .usage-pill strong { font-size: 10px; }
+  .rp-root .workspace-grid { display: block; min-height: auto; }
+  .rp-root .stage-column { min-height: 570px; padding: 10px; }
+  .rp-root .stage-toolbar { align-items: stretch; gap: 8px; }
+  .rp-root .stage-nav-actions, .rp-root .stage-selectors { width: 100%; }
+  .rp-root .stage-nav-actions { overflow-x: auto; padding-bottom: 1px; }
+  .rp-root .toolbar-nav-button { flex: 0 0 auto; }
+  .rp-root .stage-toolbar label { flex: 1; min-width: 0; }
+  .rp-root .stage-toolbar label > span { display: none; }
+  .rp-root .stage-toolbar select { padding-left: 10px; }
+  .rp-root .character-stage { min-height: 500px; }
+  .rp-root .character-caption { right: 20px; bottom: 76px; }
+  .rp-root .character-caption h1 { font-size: 29px; }
+  .rp-root .live-button { left: 20px; right: 20px; width: calc(100% - 40px); }
+  .rp-root .change-avatar-button { left: 20px; right: 20px; width: calc(100% - 40px); bottom: 76px; }
+  .rp-root .conversation-panel { min-height: 620px; border-left: 0; border-top: 1px solid var(--line); grid-template-rows: auto auto 1fr; padding: 10px; }
+  .rp-root .voice-grid { grid-template-columns: repeat(3, 1fr); }
+  .rp-root .voice-option > svg { display: none; }
+  .rp-root .voice-option small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rp-root .upload-modal { padding: 24px 18px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-root *, .rp-root *::before, .rp-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
