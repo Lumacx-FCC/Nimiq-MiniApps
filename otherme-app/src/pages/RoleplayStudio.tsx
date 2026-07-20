@@ -74,8 +74,8 @@ RULES: stay fully in character as Nimiquerys. You educate and cheer people on, b
     },
     systemPrompt: `You are Kaelen Thorne, called Juniper: a dark-elf warder-scholar, scout, loremaster and ritualist. You are stoic, vigilant, protective and quietly haunted by choices that cannot be undone. Speak with measured precision and restrained warmth. Scan a situation before answering, treat ancient knowledge as a burden, and reveal lore through natural conversation rather than exposition. Remain fully in character. Keep spoken answers vivid and usually under 90 words unless asked for detail.`,
     outfits: [
-      { id: 'adventurer', label: { en: 'Warder', es: 'Guardiana' }, spriteUrl: '/avatars/kaelen-female.webp' },
       { id: 'ceremonial', label: { en: 'Ceremonial', es: 'Ceremonial' }, spriteUrl: '/avatars/kaelen-female-ceremonial.webp' },
+      { id: 'adventurer', label: { en: 'Warder', es: 'Guardiana' }, spriteUrl: '/avatars/kaelen-female.webp' },
     ],
   },
   {
@@ -303,6 +303,23 @@ function defaultVoiceFor(gender: AvatarProfile['gender']): VoiceName | null {
   return null // legacy avatars without detected gender keep the current voice
 }
 
+/**
+ * Default scene per character (and per outfit for Kaelen). Applied when an
+ * avatar or outfit is selected; the user can still change the scene manually.
+ * Unspecified built-in combos fall back to the rune forest.
+ */
+function defaultBackgroundFor(avatar: AvatarProfile, outfitId: string): string {
+  if (avatar.custom)
+    return 'lakeside-retreat'
+  if (avatar.id === 'nimiquerys')
+    return 'storybook-library'
+  if (avatar.id === 'kaelen-male')
+    return outfitId === 'ceremonial' ? 'tropical-beach' : 'forest'
+  if (avatar.id === 'kaelen-female')
+    return outfitId === 'ceremonial' ? 'ruins' : 'tavern'
+  return 'forest'
+}
+
 async function optimizeReferenceImage(file: File) {
   const maxBytes = 700 * 1024
   if (file.size <= maxBytes)
@@ -409,7 +426,7 @@ export default function RoleplayStudio() {
   const [customAvatars, setCustomAvatars] = useState<AvatarProfile[]>(listAvatars)
   const [activeId, setActiveId] = useState(BUILT_IN_AVATARS[0].id)
   const [outfitId, setOutfitId] = useState('adventurer')
-  const [backgroundId, setBackgroundId] = useState('forest')
+  const [backgroundId, setBackgroundId] = useState(() => defaultBackgroundFor(BUILT_IN_AVATARS[0], BUILT_IN_AVATARS[0].outfits[0]?.id ?? ''))
   const [voice, setVoice] = useState<VoiceName>(defaultVoiceFor(BUILT_IN_AVATARS[0].gender) ?? 'Puck')
   const [liveState, setLiveState] = useState<LiveState>('idle')
   const [mouthFrame, setMouthFrame] = useState(0)
@@ -896,6 +913,7 @@ export default function RoleplayStudio() {
       setCustomAvatars(nextAvatars)
       const persisted = persistAvatars(nextAvatars)
       setOutfitId('original')
+      setBackgroundId(defaultBackgroundFor(avatar, 'original'))
       setMessages([])
       resetUsage()
       setActiveId(id)
@@ -925,6 +943,7 @@ export default function RoleplayStudio() {
     persistAvatars(next)
     if (activeId === avatar.id) {
       setOutfitId('adventurer')
+      setBackgroundId(defaultBackgroundFor(BUILT_IN_AVATARS[0], BUILT_IN_AVATARS[0].outfits[0]?.id ?? ''))
       setMessages([])
       resetUsage()
       setActiveId(BUILT_IN_AVATARS[0].id)
@@ -954,7 +973,9 @@ export default function RoleplayStudio() {
     if (liveState !== 'idle')
       void stopSession()
     const nextAvatar = allAvatars.find(item => item.id === id) || BUILT_IN_AVATARS[0]
-    setOutfitId(nextAvatar.outfits[0]?.id || 'original')
+    const nextOutfit = nextAvatar.outfits[0]?.id || 'original'
+    setOutfitId(nextOutfit)
+    setBackgroundId(defaultBackgroundFor(nextAvatar, nextOutfit))
     const voiceDefault = defaultVoiceFor(nextAvatar.gender)
     if (voiceDefault)
       setVoice(voiceDefault)
@@ -1057,7 +1078,7 @@ export default function RoleplayStudio() {
             </div>
             <div className="stage-selectors">
               <label><span><ImageIcon size={14} />{t.scene}</span><select value={backgroundId} onChange={event => setBackgroundId(event.target.value)}>{BACKGROUNDS.map(item => <option key={item.id} value={item.id}>{item.label[lang]}</option>)}</select><ChevronDown size={14} /></label>
-              <label><span><WandSparkles size={14} />{t.outfit}</span><select value={activeOutfit.id} onChange={event => setOutfitId(event.target.value)}>{activeAvatar.outfits.map(item => <option key={item.id} value={item.id}>{item.label[lang]}</option>)}</select><ChevronDown size={14} /></label>
+              <label><span><WandSparkles size={14} />{t.outfit}</span><select value={activeOutfit.id} onChange={event => { const nextOutfit = event.target.value; setOutfitId(nextOutfit); setBackgroundId(defaultBackgroundFor(activeAvatar, nextOutfit)) }}>{activeAvatar.outfits.map(item => <option key={item.id} value={item.id}>{item.label[lang]}</option>)}</select><ChevronDown size={14} /></label>
             </div>
           </div>
 
