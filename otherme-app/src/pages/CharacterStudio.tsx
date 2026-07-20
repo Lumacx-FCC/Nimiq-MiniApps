@@ -17,6 +17,7 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
+import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { FREE_SHEET_GENERATIONS, SHEET_RENDER_CREDITS } from '../core/config'
 import AppHeader from '../components/AppHeader'
@@ -190,7 +191,7 @@ export default function CharacterStudio() {
     setIsAnalyzing(true)
     try {
       const { base64, mimeType } = splitDataUrl(image)
-      const response = await fetch('/api/analyze-character', {
+      const response = await fetch(apiUrl('/api/analyze-character'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64, mimeType }),
@@ -228,7 +229,7 @@ export default function CharacterStudio() {
         payload.referenceImageBase64 = base64
         payload.referenceMimeType = mimeType
       }
-      const response = await fetch('/api/generate-sheet', {
+      const response = await fetch(apiUrl('/api/generate-sheet'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

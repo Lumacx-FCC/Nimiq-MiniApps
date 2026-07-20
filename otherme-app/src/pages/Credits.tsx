@@ -2,7 +2,7 @@
  * Credits — balance, pack purchase with USDT (Polygon) or NIM (+50% bonus),
  * purchase history. Mirrors core-modules CreditsCard on the React bridge.
  */
-import { Coins, History, LogOut } from 'lucide-react'
+import { Coins, History, LogOut, Smartphone, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreditPack } from '@core/config'
@@ -23,6 +23,9 @@ const COPY = {
     liveRate: 'live rate',
     fallbackRate: 'offline rate',
     usdtNetwork: 'USDT requires the Polygon network — Nimiq Pay will ask you to switch if needed.',
+    newToNimiq: 'New on Nimiq?',
+    getNimiqPay: 'Get Nimiq Pay App',
+    openTip: 'Open this app’s URL inside the Nimiq Pay app to add credits.',
     history: 'Purchases',
     empty: 'No purchases yet.',
     logout: 'Log out',
@@ -39,6 +42,9 @@ const COPY = {
     liveRate: 'tasa en vivo',
     fallbackRate: 'tasa offline',
     usdtNetwork: 'USDT requiere la red Polygon — Nimiq Pay te pedirá cambiar de red si es necesario.',
+    newToNimiq: '¿Nuevo en Nimiq?',
+    getNimiqPay: 'Descargar Nimiq Pay',
+    openTip: 'Abre la URL de esta app dentro de Nimiq Pay para añadir créditos.',
     history: 'Compras',
     empty: 'Aún no hay compras.',
     logout: 'Cerrar sesión',
@@ -144,6 +150,34 @@ export default function Credits() {
           </p>
         </div>
         {error && <div className="nq-notice error" role="alert">{error}</div>}
+      </div>
+
+      <div className="om-card mb-4">
+        <div className="grid grid-cols-2 gap-2">
+          <a
+            className="om-button secondary"
+            href="https://www.nimiq.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 13, padding: '10px 12px' }}
+          >
+            <Sparkles size={15} />
+            {t.newToNimiq}
+          </a>
+          <a
+            className="om-button secondary"
+            href="https://www.nimiq.com/apps?made-by=official"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 13, padding: '10px 12px' }}
+          >
+            <Smartphone size={15} />
+            {t.getNimiqPay}
+          </a>
+        </div>
+        <p className="text-xs text-center mt-2.5 mb-0" style={{ color: 'var(--text-40)' }}>
+          {t.openTip}
+        </p>
       </div>
 
       <div className="om-card mb-4">

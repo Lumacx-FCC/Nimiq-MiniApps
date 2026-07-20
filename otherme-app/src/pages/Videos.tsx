@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
+import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { VIDEO_CREDITS, VIDEO_MAX_EDITS } from '../core/config'
 import { compileVideoPrompt } from '../character/fields'
@@ -153,7 +154,7 @@ export default function Videos() {
       payload.previousInteractionId = previousInteractionId
     else if (references.length)
       payload.referenceImages = references.map(reference => splitDataUrl(reference.imageDataUrl))
-    const response = await fetch('/api/generate-video', {
+    const response = await fetch(apiUrl('/api/generate-video'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

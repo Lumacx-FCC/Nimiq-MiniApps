@@ -264,6 +264,8 @@ async function generateSheet(body: any, res: ServerResponse): Promise<void> {
   }
   if (!response!.ok) {
     const details = await response!.text()
+    if (response!.status === 400 && /safety|moderation/i.test(details))
+      return send(res, 400, { error: 'A reference image was blocked by the image provider\'s content safety filter. Remove or replace a reference image and try again.' })
     return send(res, response!.status, { error: `Image generation failed (${response!.status}): ${details.slice(0, 300)}` })
   }
   const result = await response!.json() as { data?: Array<{ b64_json?: string }> }
@@ -400,6 +402,8 @@ async function generateAvatar(body: any, res: ServerResponse): Promise<void> {
       const details = await imageResponse.text()
       if (RETRYABLE_STATUS.has(imageResponse.status))
         return send(res, 503, { error: 'GPT Image is temporarily unavailable after retrying. Please try again in a minute.' })
+      if (imageResponse.status === 400 && /safety|moderation/i.test(details))
+        return send(res, 400, { error: 'This reference image was blocked by the image provider\'s content safety filter. Try a different image.' })
       return send(res, imageResponse.status, { error: `GPT Image request failed (${imageResponse.status}): ${details.slice(0, 300)}` })
     }
     const result = await imageResponse.json() as { data?: Array<{ b64_json?: string }> }

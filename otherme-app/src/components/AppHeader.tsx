@@ -2,17 +2,18 @@
  * Shared header: OM logo (home navigation), credits pill when logged in,
  * theme + language toggles. Present on every page.
  */
-import { Coins, Home, Languages, Moon, Sun } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { Coins, Home, Languages, LogOut, Moon, Sun } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
 import { useCredits } from '../core/credits'
 
 export default function AppHeader({ title }: { title?: string }) {
   const { theme, toggleTheme, lang, toggleLang } = useSettings()
-  const { isLoggedIn, user } = useAuth()
+  const { isLoggedIn, user, logout } = useAuth()
   const { balance } = useCredits()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const isHome = pathname === '/'
 
   return (
@@ -46,6 +47,16 @@ export default function AppHeader({ title }: { title?: string }) {
           <Languages size={15} />
           {lang.toUpperCase()}
         </button>
+        {isLoggedIn && (
+          <button
+            className="icon-chip"
+            onClick={() => { logout(); navigate('/') }}
+            title={lang === 'es' ? 'Cerrar sesión' : 'Log out'}
+            aria-label={lang === 'es' ? 'Cerrar sesión' : 'Log out'}
+          >
+            <LogOut size={15} />
+          </button>
+        )}
       </div>
     </header>
   )

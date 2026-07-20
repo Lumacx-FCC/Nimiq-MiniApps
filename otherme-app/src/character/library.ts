@@ -4,6 +4,7 @@
  * (Firestore doc per sheet, Storage for the image) without touching the UI.
  */
 import type { CharacterSheet } from './fields'
+import { apiUrl } from '../core/api'
 
 export interface SavedSheet {
   id: string
@@ -99,7 +100,7 @@ function anchorDownload(blob: Blob, filename: string): void {
  * short-lived link the user opens in a real browser, where downloads work.
  */
 async function shareViaBrowserLink(blob: Blob, filename: string): Promise<void> {
-  const response = await fetch('/api/share', {
+  const response = await fetch(apiUrl('/api/share'), {
     method: 'POST',
     headers: { 'Content-Type': blob.type || 'application/octet-stream', 'X-Filename': encodeURIComponent(filename) },
     body: blob,
@@ -107,7 +108,10 @@ async function shareViaBrowserLink(blob: Blob, filename: string): Promise<void> 
   const json = await response.json() as { url?: string, error?: string }
   if (!response.ok || !json.url)
     throw new Error(json.error || 'Could not create download link')
-  showBrowserLinkOverlay(`${window.location.origin}${json.url}`, filename)
+  // Prod (Cloud Function) returns an absolute Firebase Storage URL; the dev
+  // Vite middleware returns a relative /api/share/:id path.
+  const link = json.url.startsWith('http') ? json.url : `${window.location.origin}${json.url}`
+  showBrowserLinkOverlay(link, filename)
 }
 
 function showBrowserLinkOverlay(url: string, filename: string): void {

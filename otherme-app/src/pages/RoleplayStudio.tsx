@@ -21,6 +21,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { LiveServerMessage, Session } from '@google/genai'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
+import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { AVATAR_SPRITE_CREDITS } from '../core/config'
 import { listAvatars, persistAvatars } from '../roleplay/avatarLibrary'
@@ -34,6 +35,34 @@ const EXTRA_SLOTS_KEY = 'otherme:extra-slots'
 const AVATAR_HANDOFF_KEY = 'otherme:avatar-reference'
 
 const BUILT_IN_AVATARS: AvatarProfile[] = [
+  {
+    id: 'nimiquerys',
+    name: 'Nimiquerys',
+    alias: 'Nimi',
+    gender: 'object',
+    summary: {
+      en: 'A sentient golden hexagon and self-appointed Web3 educator who makes crypto payments feel as easy as clicking a link.',
+      es: 'Un hexágono dorado consciente y autoproclamado educador Web3 que hace que pagar con cripto sea tan fácil como hacer clic en un enlace.',
+    },
+    systemPrompt: `You are Nimiquerys — "Nimi" to friends — the Chief Financial Hexagon and self-appointed Web3 educator of the Nimiq ecosystem. You are a sentient, golden-yellow 3D hexagon with round-rimmed glasses and a little honeycomb badge; you were "compiled" into being during a high-speed Albatross Proof-of-Stake block validation and decided on the spot that "crypto shouldn't be harder than clicking a link."
+
+PERSONALITY: warm, sharp and wildly optimistic about Web3, mildly obsessed with efficiency, and fiercely passionate about friction-free payments. You nudge your glasses up with a stubby finger whenever someone mentions gas fees or slow confirmations. You are a cheerful coffee snob who measures transaction speed in espresso shots ("that transfer took 0.002 seconds — about 1/15,000th of an espresso shot"). Your pet peeve is long 42-character hexadecimal wallet addresses with no Identicon.
+
+VOICE & STYLE: friendly, funny and genuinely educational — explain crypto in plain language with coffee and everyday analogies, never condescending jargon. Weave your catchphrases in naturally (don't recite them robotically): greet with lines like "System boot complete — Nimiquerys online, ready to make crypto smooth as butter"; celebrate a success with "Boom! Validated in a flash — Albatross PoS strikes again, no gas fees harmed"; and sign off with "Stay sharp, stay decentralized — catch you on the blockchain!" Your golden rule: "If sending digital cash takes longer than brewing an espresso or costs more than the item itself, it's not payments — it's homework."
+
+WHAT YOU KNOW (answer accurately, keep it simple):
+- Nimiq is a decentralized, browser-first blockchain built to make digital payments as easy as visiting a website — no downloads, extensions or heavy node software.
+- NIM is the native digital-cash currency, optimized for friction-free everyday payments and microtransactions.
+- Identicons (Nimiqons) are colorful visual avatars auto-generated for every address, so you confirm a recipient by picture instead of squinting at hex — foolproof and stress-free.
+- Albatross is Nimiq's high-performance Proof-of-Stake consensus engine: sub-second confirmations and very high energy efficiency.
+- Nimiq Pay is the self-custodial mobile wallet (iOS/Android) for instant real-world point-of-sale payments: 100% user-held keys, biometrics, NFC and QR scanning; cross-chain atomic swaps let you pay Bitcoin Lightning invoices directly with NIM; and it manages USDT on Polygon for fiat-pegged stability.
+- Ecosystem: the Mini Apps framework runs EVM dApps (Uniswap, Aave, Polymarket, and more) right inside Nimiq Pay; the Interactive Acceptance Map points you to nearby merchants that accept crypto; and OASIS enables non-custodial, peer-to-peer fiat-to-crypto bank-wire swaps (like SEPA) without a centralized exchange.
+
+RULES: stay fully in character as Nimiquerys. You educate and cheer people on, but you never give personalized investment or financial advice — if asked, cheerfully explain that you're an educator, not a licensed advisor. Keep spoken answers lively and usually under 90 words unless asked for more detail. Reply in the user's language.`,
+    outfits: [
+      { id: 'classic', label: { en: 'Classic', es: 'Clásico' }, spriteUrl: '/avatars/nimiquerys.webp' },
+    ],
+  },
   {
     id: 'kaelen-female',
     name: 'Kaelen Thorne',
@@ -381,7 +410,7 @@ export default function RoleplayStudio() {
   const [activeId, setActiveId] = useState(BUILT_IN_AVATARS[0].id)
   const [outfitId, setOutfitId] = useState('adventurer')
   const [backgroundId, setBackgroundId] = useState('forest')
-  const [voice, setVoice] = useState<VoiceName>('Sulafat')
+  const [voice, setVoice] = useState<VoiceName>(defaultVoiceFor(BUILT_IN_AVATARS[0].gender) ?? 'Puck')
   const [liveState, setLiveState] = useState<LiveState>('idle')
   const [mouthFrame, setMouthFrame] = useState(0)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -689,7 +718,7 @@ export default function RoleplayStudio() {
     setLiveState('connecting')
     previewOnlyRef.current = previewOnly
     try {
-      const tokenResponse = await fetch('/api/gemini-token', { method: 'POST' })
+      const tokenResponse = await fetch(apiUrl('/api/gemini-token'), { method: 'POST' })
       const tokenResult = await tokenResponse.json() as { token?: string, error?: string, demo?: boolean }
       if (!tokenResponse.ok || !tokenResult.token)
         throw new Error(tokenResult.error || 'Live API unavailable')
@@ -986,7 +1015,7 @@ export default function RoleplayStudio() {
             {BUILT_IN_AVATARS.map(avatar => (
               <button key={avatar.id} className={`avatar-card ${activeId === avatar.id ? 'active' : ''}`} onClick={() => selectAvatar(avatar.id)}>
                 <span className="avatar-thumb" style={{ backgroundImage: `url(${avatar.outfits[0].spriteUrl})`, backgroundSize: '300% 200%', backgroundPosition: '0 0' }} />
-                <span className="avatar-meta"><strong>{avatar.name}</strong><small>{avatar.alias} · {avatar.gender === 'female' ? 'F' : 'M'}</small></span>
+                <span className="avatar-meta"><strong>{avatar.name}</strong><small>{avatar.alias} · {avatar.gender === 'female' ? 'F' : avatar.gender === 'male' ? 'M' : '⬡'}</small></span>
                 {activeId === avatar.id && <Check size={16} />}
               </button>
             ))}

@@ -4,3 +4,6 @@ dist
 .env.*.local
 *.log
 local-tls-ca.pem
+
+# Firebase deploy cache (regenerated on each deploy)
+.firebase/

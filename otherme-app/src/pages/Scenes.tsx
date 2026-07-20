@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
+import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { FREE_SCENE_GENERATIONS, SCENE_CREDITS } from '../core/config'
 import { RenderStyle, styleDirective } from '../character/fields'
@@ -153,7 +154,7 @@ export default function Scenes() {
       const payload: Record<string, unknown> = { prompt: compileScenePrompt(references, description.trim(), renderStyle) }
       if (references.length)
         payload.referenceImages = references.map(reference => splitDataUrl(reference.imageDataUrl))
-      const response = await fetch('/api/generate-sheet', {
+      const response = await fetch(apiUrl('/api/generate-sheet'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
