@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// OtherMe credits ledger.
+//
+// Source of truth is the server: all writes to users / orders / ledger go
+// through the Cloud Function using the Admin SDK, which bypasses these rules.
+// Rules here are defense-in-depth for the *client* SDK (realtime reads):
+//   - a signed-in user (uid == their Nimiq address) may READ only their own
+//     data (Phase 2+: the confirming-payment UI subscribes via onSnapshot).
+//   - clients may never WRITE ledger, balance, or order state.
+// Phase 1 (auth) needs none of these reads yet; they're set for later phases.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /ledger_entries/{userId}/entries/{txHash} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // Login challenges are server-only; never exposed to the client SDK.
+    match /auth_challenges/{address} {
+      allow read, write: if false;
+    }
+  }
+}

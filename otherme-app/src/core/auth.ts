@@ -9,6 +9,7 @@ import { isInsideNimiqPay, loginWithNimiq } from '@core/auth/nimiqAuth'
 import { getConfig } from '@core/config'
 import { createStore, useStore } from './store'
 import { loadCreditsFor } from './credits'
+import { clearServerSession, establishServerSession } from './session'
 
 export type { AuthUser }
 
@@ -63,13 +64,26 @@ export const auth = {
   get isLoggedIn() { return authStore.get().user !== null },
   canUseNimiq: isInsideNimiqPay,
   canUseGoogle: isGoogleLoginAvailable,
-  loginWithNimiq: () => runLogin(loginWithNimiq),
+  loginWithNimiq: async () => {
+    const ok = await runLogin(loginWithNimiq)
+    // Additive: prove wallet ownership to the backend for a verified session.
+    // Non-blocking — local login already succeeded; a failed/declined proof
+    // (or an undeployed server) must not undo it. Server becomes authoritative
+    // for the credits ledger in a later phase.
+    if (ok) {
+      establishServerSession().catch((e) => {
+        console.warn('[session] server session not established:', e instanceof Error ? e.message : e)
+      })
+    }
+    return ok
+  },
   loginWithGoogle: () => runLogin(loginWithGoogle),
   loginWithEmail: (email: string, password: string) => runLogin(() => loginWithEmail(email, password)),
   signUpWithEmail: (email: string, password: string) => runLogin(() => signUpWithEmail(email, password)),
   logout: () => {
     persist(null)
     authStore.set({ user: null, isBusy: false, error: null })
+    void clearServerSession()
   },
 }
 
