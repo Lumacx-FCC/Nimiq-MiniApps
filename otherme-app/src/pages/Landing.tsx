@@ -304,7 +304,7 @@ export default function Landing() {
               <iframe
                 width="100%"
                 height="100%"
-                src="https://www.youtube-nocookie.com/embed/V3fPfa8Rr0s?autoplay=1"
+                src="https://www.youtube-nocookie.com/embed/__MXZPHh1cc?autoplay=1"
                 title={t.tutorial}
                 style={{ border: 0 }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

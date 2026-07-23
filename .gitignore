@@ -15,6 +15,9 @@ reference/
 # Redundant extraction of the committed AeternumRoleplay-source.zip
 App - Other Me/Apps integration/aeternum-extracted/
 
+# Marketing assets (kept out of the repo)
+marketing/
+
 # Dependencies/builds
 node_modules/
 dist/
