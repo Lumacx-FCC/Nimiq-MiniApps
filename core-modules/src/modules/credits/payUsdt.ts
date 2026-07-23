@@ -29,9 +29,10 @@ function getEthereum() {
 /**
  * Pay `usdAmount` USDT (Polygon) to the treasury. Two native approval
  * dialogs: chain switch (if needed) and the transfer itself.
- * Returns the transaction hash.
+ * Returns the transaction hash and the payer address (the `from` address is
+ * needed server-side to bind the payment to an order — see the credits plan).
  */
-export async function payUsdt(usdAmount: number): Promise<string> {
+export async function payUsdt(usdAmount: number): Promise<{ txHash: string, from: string }> {
   const provider = getEthereum()
 
   const [from] = await provider.request({ method: 'eth_requestAccounts' }) as string[]
@@ -55,8 +56,9 @@ export async function payUsdt(usdAmount: number): Promise<string> {
     ],
   })
 
-  return await provider.request({
+  const txHash = await provider.request({
     method: 'eth_sendTransaction',
     params: [{ from, to: USDT_POLYGON.address, data }],
   }) as string
+  return { txHash, from }
 }

@@ -18,6 +18,7 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
 import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
+import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
@@ -481,6 +482,10 @@ router.get("/credits/balance", wrap(handleBalance));
 router.post("/credits/migrate", json, wrap(handleMigrate));
 router.post("/credits/spend", json, wrap(handleSpend));
 router.post("/credits/record-purchase", json, wrap(handleRecordPurchase));
+
+// Payment intents (Phase 3). The reconciler (Phase 4) verifies claimed txs.
+router.post("/orders", json, wrap(handleCreateOrder));
+router.post("/orders/:id/claim", json, wrap(handleClaimOrder));
 
 // Mounted twice: "/api/*" for the Hosting rewrite and the run.app direct URL;
 // "/*" for the cloudfunctions.net URL, which strips the function-name segment

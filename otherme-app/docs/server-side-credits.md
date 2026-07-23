@@ -16,16 +16,25 @@ links back to the numbered sections here.
   Firebase Auth user. Backend lives in the existing `functions` `api` Express
   function (`/api/auth/challenge`, `/api/auth/verify`); client in
   `src/core/{firebase,session}.ts`, wired non-blocking in `src/core/auth.ts`.
-- 🟡 **Phase 2 — server-authoritative ledger (§6): implemented, pending deploy +
-  device test.** Authenticated routes on the `api` function: `GET
+- ✅ **Phase 2 — server-authoritative ledger (§6): DONE, deployed, verified
+  on-device.** Migration confirmed (user doc shows `balance: 4404`,
+  `welcomeGranted: true`). Routes on the `api` function: `GET
   /api/credits/balance`, `POST /api/credits/{migrate,spend,record-purchase}`
   (`functions/src/credits/`). Client (`src/core/credits.ts`) seeds from the
-  server on session (guarded one-time self-import of the localStorage balance),
-  dual-writes spends and purchases, and keeps localStorage as an offline cache.
-  Server ledger applies to Nimiq-wallet logins only; email/Google stay local.
-  `record-purchase` trusts the client for now — replaced by Phase 4's reconciler.
-- ⬜ Phase 3 — payment intents (§7)
-- ⬜ Phase 4 — background reconciler (§8)
+  server on session, dual-writes spends and purchases, keeps localStorage as an
+  offline cache. Wallet logins only; `record-purchase` trusts the client for
+  now — replaced by Phase 4's reconciler.
+- 🟡 **Phase 3 — payment intents (§7): implemented, pending deploy + device
+  test.** `POST /api/orders` (server fixes amount from its own PACKS + frozen NIM
+  rate + a reference) and `POST /api/orders/:id/claim` (`functions/src/orders/`,
+  `functions/src/config.ts`). Client purchase flow (`src/core/credits.ts`):
+  order → pay the server amount tagging the tx with the order id → claim.
+  `payUsdt` now also returns the payer address. Credits still granted via the
+  temporary `record-purchase`; Phase 4 moves granting to the verified
+  reconciler that consumes `submitted` orders.
+- ⬜ Phase 4 — background reconciler (§8) — **blocked on on-chain RPC access**
+  (Polygon RPC key; a Nimiq Albatross RPC endpoint — no free public one, likely
+  a self-run node). See §14/notes.
 - ⬜ Phase 5 — atomic grant (§9)
 
 ## Deployment notes / gotchas (learned in Phase 1)

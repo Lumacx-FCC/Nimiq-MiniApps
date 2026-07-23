@@ -143,6 +143,68 @@ onSessionChange((address) => {
     void syncFromServer()
 })
 
+interface ServerOrder {
+  orderId: string
+  method: 'nim' | 'usdt'
+  expectedAmount: number
+  expectedRecipient: string
+  credits: number
+}
+
+async function createServerOrder(method: 'nim' | 'usdt', packUsd: number): Promise<ServerOrder> {
+  const data = await authedFetch('/api/orders', { method, packUsd })
+  if (!data || data.error)
+    throw new Error(data?.error || 'Could not create the payment order')
+  return data as ServerOrder
+}
+
+async function claimServerOrder(orderId: string, txHash: string, payerAddress?: string): Promise<void> {
+  await authedFetch(`/api/orders/${orderId}/claim`, { txHash, payerAddress })
+}
+
+/**
+ * Execute a purchase and return the record to grant.
+ *
+ * With a wallet session (Phase 3): create a server order (server fixes the
+ * amount + a reference), pay that amount tagging the tx with the order id, then
+ * claim it — recording the tx for Phase 4's on-chain reconciler. Credits are
+ * still granted now via the temporary record-purchase path in runPurchase;
+ * Phase 4 moves granting to the verified reconciler.
+ *
+ * Without a session (email/Google login): legacy client-only quote + pay.
+ */
+async function purchase(method: 'nim' | 'usdt', pack: CreditPack): Promise<PurchaseRecord> {
+  const at = new Date().toISOString()
+  const token = await getSessionToken()
+
+  if (token) {
+    const order = await createServerOrder(method, pack.usd)
+    let txHash: string
+    let payerAddress: string | undefined
+    if (method === 'nim') {
+      txHash = await payNim(order.expectedAmount, order.orderId)
+    }
+    else {
+      const paid = await payUsdt(order.expectedAmount)
+      txHash = paid.txHash
+      payerAddress = paid.from
+    }
+    await claimServerOrder(order.orderId, txHash, payerAddress)
+    return { txHash, method, credits: order.credits, amount: order.expectedAmount, at }
+  }
+
+  // Legacy client-only path (no server session).
+  if (method === 'nim') {
+    const { rate } = await getNimUsdRate()
+    const quote = quoteNim(pack, rate)
+    const txHash = await payNim(quote.amount, `pack-${pack.usd}usd`)
+    return { txHash, method: 'nim', credits: quote.credits, amount: quote.amount, at }
+  }
+  const quote = quoteUsdt(pack)
+  const paid = await payUsdt(quote.amount)
+  return { txHash: paid.txHash, method: 'usdt', credits: quote.credits, amount: quote.amount, at }
+}
+
 async function runPurchase(fn: () => Promise<PurchaseRecord>): Promise<boolean> {
   creditsStore.update(s => ({ ...s, isPaying: true, error: null }))
   try {
@@ -181,17 +243,8 @@ export const credits = {
     const { rate, isLive } = await getNimUsdRate()
     return { ...quoteNim(pack, rate), rateIsLive: isLive }
   },
-  buyWithUsdt: (pack: CreditPack) => runPurchase(async () => {
-    const quote = quoteUsdt(pack)
-    const txHash = await payUsdt(quote.amount)
-    return { txHash, method: 'usdt' as const, credits: quote.credits, amount: quote.amount, at: new Date().toISOString() }
-  }),
-  buyWithNim: (pack: CreditPack) => runPurchase(async () => {
-    const { rate } = await getNimUsdRate()
-    const quote = quoteNim(pack, rate)
-    const txHash = await payNim(quote.amount, `pack-${pack.usd}usd`)
-    return { txHash, method: 'nim' as const, credits: quote.credits, amount: quote.amount, at: new Date().toISOString() }
-  }),
+  buyWithUsdt: (pack: CreditPack) => runPurchase(() => purchase('usdt', pack)),
+  buyWithNim: (pack: CreditPack) => runPurchase(() => purchase('nim', pack)),
 }
 
 export function useCredits() {
