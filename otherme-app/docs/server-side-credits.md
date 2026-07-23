@@ -1,8 +1,8 @@
 # Server-side credits with on-chain reconciliation
 
-Status: **Phase 1 complete & deployed** · Phases 2–5 pending
+Status: **Phases 1–3 complete & deployed** · Phases 4–5 pending
 Owner: OtherMe / FCC core-modules
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 This document specifies how OtherMe moves credit granting from the current
 client-side MVP to a server-authoritative model with on-chain transaction
