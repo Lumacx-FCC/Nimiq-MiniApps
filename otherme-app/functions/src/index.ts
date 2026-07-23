@@ -17,6 +17,7 @@ import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
+import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
@@ -451,8 +452,9 @@ const app = express();
 // custom X-Filename header used by the share upload.
 app.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, X-Filename");
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  // Authorization: Bearer <idToken> is sent by the authenticated credits routes.
+  res.set("Access-Control-Allow-Headers", "Content-Type, X-Filename, Authorization");
   if (req.method === "OPTIONS") {
     res.status(204).send("");
     return;
@@ -473,6 +475,12 @@ router.post("/share", express.raw({ type: () => true, limit: "25mb" }), wrap(cre
 // Signed-challenge login (Nimiq Pay signs; server verifies). See auth/routes.ts.
 router.post("/auth/challenge", json, wrap(handleAuthChallenge));
 router.post("/auth/verify", json, wrap(handleAuthVerify));
+
+// Server-authoritative credits ledger (Phase 2). All require a session token.
+router.get("/credits/balance", wrap(handleBalance));
+router.post("/credits/migrate", json, wrap(handleMigrate));
+router.post("/credits/spend", json, wrap(handleSpend));
+router.post("/credits/record-purchase", json, wrap(handleRecordPurchase));
 
 // Mounted twice: "/api/*" for the Hosting rewrite and the run.app direct URL;
 // "/*" for the cloudfunctions.net URL, which strips the function-name segment

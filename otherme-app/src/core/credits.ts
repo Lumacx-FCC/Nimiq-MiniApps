@@ -11,6 +11,8 @@ import { payUsdt } from '@core/credits/payUsdt'
 import { quoteNim, quoteUsdt } from '@core/credits/pricing'
 import { getNimUsdRate } from '@core/credits/rates'
 import { WELCOME_CREDITS } from './config'
+import { serverUrl } from './api'
+import { getSessionToken, onSessionChange } from './session'
 import { createStore, useStore } from './store'
 
 export interface PurchaseRecord {
@@ -73,10 +75,80 @@ function grant(record: PurchaseRecord): void {
   persist()
 }
 
+/* ------------------------------------------------------------------ */
+/* Server ledger (Phase 2) — authoritative when a wallet session exists */
+/* ------------------------------------------------------------------ */
+
+/** Authenticated call to the credits backend. Null when there's no session. */
+async function authedFetch(path: string, body?: unknown): Promise<any | null> {
+  const token = await getSessionToken()
+  if (!token)
+    return null // email/Google login or no server session — stay localStorage-only
+  const res = await fetch(serverUrl(path), {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return res.json().catch(() => null)
+}
+
+/** Adopt the server's authoritative balance into the local cache. */
+function adoptServerBalance(data: any | null): void {
+  if (data && typeof data.balance === 'number') {
+    creditsStore.update(s => ({ ...s, balance: data.balance }))
+    persist()
+  }
+}
+
+/**
+ * Sync with the server ledger. On first ever call it imports the current local
+ * balance (one-time, guarded server-side); afterwards the server balance wins.
+ * No-op without a session (localStorage stays authoritative).
+ */
+async function syncFromServer(): Promise<void> {
+  try {
+    adoptServerBalance(await authedFetch('/api/credits/migrate', { localBalance: creditsStore.get().balance }))
+  }
+  catch {
+    // Offline / server down — keep the local cache; nothing depends on this.
+  }
+}
+
+async function reconcileSpend(amount: number, kind: string): Promise<void> {
+  try {
+    // 402 (insufficient) still returns the authoritative balance to adopt.
+    adoptServerBalance(await authedFetch('/api/credits/spend', { amount, kind }))
+  }
+  catch { /* keep optimistic local balance */ }
+}
+
+async function reconcilePurchase(record: PurchaseRecord): Promise<void> {
+  try {
+    adoptServerBalance(await authedFetch('/api/credits/record-purchase', {
+      txHash: record.txHash,
+      credits: record.credits,
+      method: record.method,
+      amount: record.amount,
+    }))
+  }
+  catch { /* keep optimistic local balance */ }
+}
+
+// Sync whenever a wallet session appears (login) or is restored (reload).
+onSessionChange((address) => {
+  if (address)
+    void syncFromServer()
+})
+
 async function runPurchase(fn: () => Promise<PurchaseRecord>): Promise<boolean> {
   creditsStore.update(s => ({ ...s, isPaying: true, error: null }))
   try {
-    grant(await fn())
+    const record = await fn()
+    grant(record)
+    void reconcilePurchase(record) // dual-write to the server ledger
     creditsStore.update(s => ({ ...s, isPaying: false }))
     return true
   }
@@ -90,12 +162,18 @@ export const credits = {
   get balance() { return creditsStore.get().balance },
   packs: () => getConfig().packs,
   highlights: () => getConfig().creditHighlights,
-  /** Spend credits inside the app. Returns false when balance is short. */
-  spend(amount: number): boolean {
+  /**
+   * Spend credits inside the app. Optimistic local decrement for instant UX,
+   * then dual-writes to the server ledger (which reconciles the authoritative
+   * balance back). Returns false when the local balance is short. `kind` labels
+   * the spend in the server ledger.
+   */
+  spend(amount: number, kind = 'spend'): boolean {
     if (creditsStore.get().balance < amount)
       return false
     creditsStore.update(s => ({ ...s, balance: s.balance - amount }))
     persist()
+    void reconcileSpend(amount, kind)
     return true
   },
   quoteUsdt,

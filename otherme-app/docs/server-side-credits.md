@@ -16,8 +16,14 @@ links back to the numbered sections here.
   Firebase Auth user. Backend lives in the existing `functions` `api` Express
   function (`/api/auth/challenge`, `/api/auth/verify`); client in
   `src/core/{firebase,session}.ts`, wired non-blocking in `src/core/auth.ts`.
-- ⬜ Phase 2 — server-authoritative ledger (§6) + migrate the existing
-  localStorage balance (server balance is currently 0 by design).
+- 🟡 **Phase 2 — server-authoritative ledger (§6): implemented, pending deploy +
+  device test.** Authenticated routes on the `api` function: `GET
+  /api/credits/balance`, `POST /api/credits/{migrate,spend,record-purchase}`
+  (`functions/src/credits/`). Client (`src/core/credits.ts`) seeds from the
+  server on session (guarded one-time self-import of the localStorage balance),
+  dual-writes spends and purchases, and keeps localStorage as an offline cache.
+  Server ledger applies to Nimiq-wallet logins only; email/Google stay local.
+  `record-purchase` trusts the client for now — replaced by Phase 4's reconciler.
 - ⬜ Phase 3 — payment intents (§7)
 - ⬜ Phase 4 — background reconciler (§8)
 - ⬜ Phase 5 — atomic grant (§9)
@@ -393,3 +399,30 @@ const PAY_COPY_ES = {
 - **One tx claimed across two orders:** `txHash` unique across the whole ledger,
   not per order.
 - **Spam:** rate-limit `/challenge` and `/orders` per address.
+
+---
+
+## 14. Post-competition / future (out of scope for Phases 1–5)
+
+Phases 1–5 are deliberately **wallet-anchored**: identity is proven by a Nimiq
+signature and credits are bought with NIM/USDT inside Nimiq Pay. The items below
+are a separate, post-competition workstream for a **browser-distributed** build
+and are intentionally not part of the current plan.
+
+- **Email/Google users are demo-only today** — client-side `localStorage`
+  accounts with no backend, no server ledger, no verification
+  (`emailAuth.ts` is marked "NOT PRODUCTION AUTH"; Google is decoded client-side
+  only). They are not covered by the server-side security model.
+- **Gmail (Google) login — production.** Move to server-side verification: send
+  the Google ID token to the backend, verify its signature, mint a Firebase
+  session, and give these users their own server ledger (same shape as wallet
+  users). Also needs the external-browser redirect flow (Google blocks OAuth in
+  WebViews).
+- **PayPal payments.** Currently `paypalEnabled: false` and **prohibited inside
+  Nimiq Pay** by the competition rules. For the browser-distributed version,
+  enable PayPal as the credit-purchase rail for non-wallet (email/Google) users,
+  with server-side capture verification (the PayPal analog of the on-chain
+  reconciler) before granting credits.
+- Net effect: two parallel secured cohorts — wallet users (NIM/USDT, on-chain
+  verified) and browser users (Google login, PayPal verified) — sharing the same
+  server ledger.
