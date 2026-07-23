@@ -24,18 +24,37 @@ links back to the numbered sections here.
   server on session, dual-writes spends and purchases, keeps localStorage as an
   offline cache. Wallet logins only; `record-purchase` trusts the client for
   now — replaced by Phase 4's reconciler.
-- 🟡 **Phase 3 — payment intents (§7): implemented, pending deploy + device
-  test.** `POST /api/orders` (server fixes amount from its own PACKS + frozen NIM
-  rate + a reference) and `POST /api/orders/:id/claim` (`functions/src/orders/`,
+- ✅ **Phase 3 — payment intents (§7): DONE, deployed, verified on-device.**
+  Order doc confirmed (`status: submitted`, matching `txHash`, server-computed
+  `expectedAmount`/`expectedBaseUnits`/`reference`, `credits: 90`). `POST
+  /api/orders` (server fixes amount from its own PACKS + frozen NIM rate + a
+  reference) and `POST /api/orders/:id/claim` (`functions/src/orders/`,
   `functions/src/config.ts`). Client purchase flow (`src/core/credits.ts`):
   order → pay the server amount tagging the tx with the order id → claim.
   `payUsdt` now also returns the payer address. Credits still granted via the
-  temporary `record-purchase`; Phase 4 moves granting to the verified
-  reconciler that consumes `submitted` orders.
-- ⬜ Phase 4 — background reconciler (§8) — **blocked on on-chain RPC access**
-  (Polygon RPC key; a Nimiq Albatross RPC endpoint — no free public one, likely
-  a self-run node). See §14/notes.
+  temporary `record-purchase`; Phase 4 moves granting to the verified reconciler.
+
+**— Phases 1–3 complete (server owns identity, ledger, and payment intents).
+Remaining work replaces the client-trusted `record-purchase` with on-chain
+verification. —**
+
+- ⬜ Phase 4 — background reconciler (§8) — **blocked on on-chain RPC access.**
+  Polygon RPC key (free Alchemy/Infura) unblocks USDT verification immediately;
+  NIM needs a self-run Nimiq Albatross node (no free public RPC). Plan: verify
+  USDT first, add NIM once a node is up. See §14/notes.
 - ⬜ Phase 5 — atomic grant (§9)
+
+## Security notes
+
+- **Firebase web API key (`src/core/firebase.ts`) is public by design** and safe
+  to commit — it ships in the client bundle regardless. GitHub secret-scanning
+  flags all `AIza…` keys; for a Firebase web key that's a false-positive class.
+  Real secrets (`GEMINI_API_KEY`, `OPENAI_API_KEY`) are in Secret Manager +
+  gitignored `.env.local`, never committed. Hardening applied: the browser key
+  is API-restricted in GCP (Identity Toolkit, Token Service, Firebase
+  Installations, Cloud Firestore) and access is gated by Firestore rules + the
+  signed-challenge Auth. App Check is a future add (needs a small client SDK
+  change).
 
 ## Deployment notes / gotchas (learned in Phase 1)
 
