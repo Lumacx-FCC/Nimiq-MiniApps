@@ -99,7 +99,7 @@ export function useCredits() {
     },
     buyWithUsdt: (pack: CreditPack) => runPurchase(async () => {
       const quote = quoteUsdt(pack)
-      const txHash = await payUsdt(quote.amount)
+      const { txHash } = await payUsdt(quote.amount)
       return { txHash, method: 'usdt', credits: quote.credits, amount: quote.amount, at: new Date().toISOString() }
     }),
     buyWithNim: (pack: CreditPack) => runPurchase(async () => {
