@@ -10,11 +10,12 @@ configure({
   // Team test treasury accounts (same as core-modules demo). Replace for production.
   nimTreasuryAddress: 'NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F',
   evmTreasuryAddress: '0xdA5727CEb6bc093f22F6d56b75F5B3773Fbdf4D1',
-  // TESTING PRICES (÷100). Production: $1/60, $5/500, $20/3000.
+  // TESTING PRICES (÷5). Production: $1/60, $5/500, $20/3000.
+  // ÷5 keeps tester spend low but non-trivial, so purchases cover the AI API cost.
   packs: [
-    { usd: 0.01, credits: 60 },
-    { usd: 0.05, credits: 500 },
-    { usd: 0.20, credits: 3000 },
+    { usd: 0.20, credits: 60 },
+    { usd: 1.00, credits: 500 },
+    { usd: 4.00, credits: 3000 },
   ],
   nimBonusMultiplier: 1.5,
   creditHighlights: [
