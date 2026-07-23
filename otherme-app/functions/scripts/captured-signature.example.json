@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this to captured-signature.json and paste values captured from Nimiq Pay on a device (see scripts/validate-signature.mjs header).",
+  "message": "Other Me signature test 12345",
+  "publicKey": "<hex publicKey returned by wallet.sign()>",
+  "signature": "<hex signature returned by wallet.sign()>",
+  "address": "NQ.. the signing account's address"
+}

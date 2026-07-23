@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/genai": "^2.12.0",
     "@nimiq/mini-app-sdk": "latest",
+    "firebase": "^11.0.0",
     "lucide-react": "^0.408.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

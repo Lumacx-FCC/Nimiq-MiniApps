@@ -11,3 +11,13 @@ export const API_BASE = import.meta.env.DEV
   : 'https://us-central1-otherme-18f5b.cloudfunctions.net'
 
 export const apiUrl = (path: string): string => `${API_BASE}${path}`
+
+/**
+ * Auth/credits endpoints (server-side login + on-chain verification) always hit
+ * the deployed Cloud Function — even in dev — because they need Firestore and
+ * Firebase Auth, which the Vite dev middleware (server/api.ts) does not run.
+ * The function sets permissive CORS, so a dev tunnel origin can call it.
+ */
+export const SERVER_BASE = 'https://us-central1-otherme-18f5b.cloudfunctions.net'
+
+export const serverUrl = (path: string): string => `${SERVER_BASE}${path}`

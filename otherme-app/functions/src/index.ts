@@ -16,6 +16,7 @@ import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
@@ -434,6 +435,9 @@ async function createShare(req: Request, res: Response): Promise<void> {
 const wrap = (fn: (req: Request, res: Response) => Promise<void> | void) =>
   (req: Request, res: Response): void => {
     Promise.resolve(fn(req, res)).catch((error) => {
+      // Log server-side so failures are visible in Cloud Logging (the request
+      // log only records the 500 status, not the cause).
+      console.error(`[api] ${req.method} ${req.path} failed:`, error);
       if (!res.headersSent)
         send(res, 500, { error: error instanceof Error ? error.message : "Server error" });
     });
@@ -465,6 +469,10 @@ router.post("/generate-avatar", json, wrap((req, res) => generateAvatar(req.body
 router.post("/generate-video", json, wrap((req, res) => generateVideo(req.body, res)));
 router.post("/gemini-token", wrap((_req, res) => geminiToken(res)));
 router.post("/share", express.raw({ type: () => true, limit: "25mb" }), wrap(createShare));
+
+// Signed-challenge login (Nimiq Pay signs; server verifies). See auth/routes.ts.
+router.post("/auth/challenge", json, wrap(handleAuthChallenge));
+router.post("/auth/verify", json, wrap(handleAuthVerify));
 
 // Mounted twice: "/api/*" for the Hosting rewrite and the run.app direct URL;
 // "/*" for the cloudfunctions.net URL, which strips the function-name segment
