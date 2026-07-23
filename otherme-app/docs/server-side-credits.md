@@ -16,8 +16,14 @@ links back to the numbered sections here.
   Firebase Auth user. Backend lives in the existing `functions` `api` Express
   function (`/api/auth/challenge`, `/api/auth/verify`); client in
   `src/core/{firebase,session}.ts`, wired non-blocking in `src/core/auth.ts`.
-- ⬜ Phase 2 — server-authoritative ledger (§6) + migrate the existing
-  localStorage balance (server balance is currently 0 by design).
+- 🟡 **Phase 2 — server-authoritative ledger (§6): implemented, pending deploy +
+  device test.** Authenticated routes on the `api` function: `GET
+  /api/credits/balance`, `POST /api/credits/{migrate,spend,record-purchase}`
+  (`functions/src/credits/`). Client (`src/core/credits.ts`) seeds from the
+  server on session (guarded one-time self-import of the localStorage balance),
+  dual-writes spends and purchases, and keeps localStorage as an offline cache.
+  Server ledger applies to Nimiq-wallet logins only; email/Google stay local.
+  `record-purchase` trusts the client for now — replaced by Phase 4's reconciler.
 - ⬜ Phase 3 — payment intents (§7)
 - ⬜ Phase 4 — background reconciler (§8)
 - ⬜ Phase 5 — atomic grant (§9)

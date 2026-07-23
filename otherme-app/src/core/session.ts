@@ -15,7 +15,7 @@
  * returns a fresh Firebase ID token to attach to /api/* calls when present.
  */
 import { getNimiq } from '@core/auth/nimiqAuth'
-import { signInWithCustomToken, signOut } from 'firebase/auth'
+import { onAuthStateChanged, signInWithCustomToken, signOut } from 'firebase/auth'
 import { serverUrl } from './api'
 import { getFirebaseAuth } from './firebase'
 
@@ -71,6 +71,15 @@ export async function establishServerSession(): Promise<string> {
 export async function getSessionToken(): Promise<string | null> {
   const user = getFirebaseAuth().currentUser
   return user ? user.getIdToken() : null
+}
+
+/**
+ * Subscribe to server-session changes. Fires with the verified address when a
+ * session is present (login or a restored session on reload) and null when it
+ * clears. Returns an unsubscribe function.
+ */
+export function onSessionChange(cb: (address: string | null) => void): () => void {
+  return onAuthStateChanged(getFirebaseAuth(), user => cb(user ? user.uid : null))
 }
 
 /** True when a verified server session is active. */
