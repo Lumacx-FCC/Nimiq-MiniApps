@@ -7,6 +7,7 @@ import CharacterStudio from './pages/CharacterStudio'
 import RoleplayStudio from './pages/RoleplayStudio'
 import Scenes from './pages/Scenes'
 import Videos from './pages/Videos'
+import Gallery from './pages/Gallery'
 
 /** Every navigation lands on the top of the new page (hero / stage in view). */
 function ScrollToTop() {
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/talk" element={<RoleplayStudio />} />
         <Route path="/scenes" element={<Scenes />} />
         <Route path="/videos" element={<Videos />} />
+        <Route path="/gallery" element={<Gallery />} />
         <Route path="*" element={<Landing />} />
       </Routes>
     </>

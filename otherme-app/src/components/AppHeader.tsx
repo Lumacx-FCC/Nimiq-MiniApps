@@ -2,7 +2,7 @@
  * Shared header: OM logo (home navigation), credits pill when logged in,
  * theme + language toggles. Present on every page.
  */
-import { Coins, Home, Languages, LogOut, Moon, Sun } from 'lucide-react'
+import { Coins, Home, Images, Languages, LogOut, Moon, Sun } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
@@ -29,6 +29,16 @@ export default function AppHeader({ title }: { title?: string }) {
       </Link>
 
       <div className="flex items-center gap-1.5">
+        {isLoggedIn && pathname !== '/gallery' && (
+          <Link
+            to="/gallery"
+            className="icon-chip no-underline"
+            aria-label={lang === 'es' ? 'Galería' : 'Gallery'}
+            title={lang === 'es' ? 'Galería' : 'Gallery'}
+          >
+            <Images size={16} />
+          </Link>
+        )}
         {isLoggedIn && (
           <Link
             to="/credits"
