@@ -162,6 +162,19 @@ export async function listSubmittedOrders(limit: number): Promise<OrderWithId[]>
   return snap.docs.map(d => ({ id: d.id, ...(d.data() as OrderDoc) }));
 }
 
+/**
+ * `pending` orders — created but never claimed (e.g. a gas-failed tap that threw
+ * before claim). Equality-only query, so no composite index needed; the caller
+ * filters by `expiresAt` and expires the stale ones.
+ */
+export async function listPendingOrders(limit: number): Promise<OrderWithId[]> {
+  const snap = await orders()
+    .where("status", "==", "pending")
+    .limit(limit)
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as OrderDoc) }));
+}
+
 /** Advance an order's status, tracking the attempt for retry/backoff bounds. */
 export async function setOrderStatus(
   orderId: string,

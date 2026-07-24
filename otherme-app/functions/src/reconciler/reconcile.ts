@@ -18,6 +18,7 @@ import {
 } from "../config.js";
 import {
   grantOrder,
+  listPendingOrders,
   listSubmittedOrders,
   setOrderStatus,
   touchOrder,
@@ -33,6 +34,7 @@ export interface ReconcileSummary {
   failed: number;
   pending: number;
   skipped: number;
+  expired: number;
 }
 
 function nimAuth(): { user: string; pass: string } | undefined {
@@ -61,7 +63,7 @@ function exhausted(order: OrderWithId): boolean {
 
 export async function runReconcile(): Promise<ReconcileSummary> {
   const orders = await listSubmittedOrders(RECONCILE_BATCH);
-  const summary: ReconcileSummary = { scanned: orders.length, granted: 0, failed: 0, pending: 0, skipped: 0 };
+  const summary: ReconcileSummary = { scanned: orders.length, granted: 0, failed: 0, pending: 0, skipped: 0, expired: 0 };
 
   for (const order of orders) {
     try {
@@ -104,6 +106,23 @@ export async function runReconcile(): Promise<ReconcileSummary> {
         summary.pending++;
       }
     }
+  }
+
+  // Sweep abandoned `pending` orders — created but never claimed (e.g. a
+  // gas-failed tap that threw before claim). They're never scanned for grants,
+  // so expire them past their TTL rather than let them accumulate. Never grants,
+  // never touches money.
+  try {
+    const stale = await listPendingOrders(RECONCILE_BATCH);
+    for (const order of stale) {
+      if (Date.now() > order.expiresAt) {
+        await setOrderStatus(order.id, "expired");
+        summary.expired++;
+      }
+    }
+  }
+  catch (err) {
+    console.error("[reconcile] pending sweep failed:", err);
   }
 
   return summary;
