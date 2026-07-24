@@ -1,8 +1,9 @@
 # Server-side credits with on-chain reconciliation
 
-Status: **Phase 1 complete & deployed** · Phases 2–5 pending
+Status: **Phases 1–3 complete & deployed · Phase 4 implemented (USDT live, NIM
+pending node)** · Phase 5 folded into Phase 4's atomic grant
 Owner: OtherMe / FCC core-modules
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 This document specifies how OtherMe moves credit granting from the current
 client-side MVP to a server-authoritative model with on-chain transaction
@@ -32,17 +33,51 @@ links back to the numbered sections here.
   `functions/src/config.ts`). Client purchase flow (`src/core/credits.ts`):
   order → pay the server amount tagging the tx with the order id → claim.
   `payUsdt` now also returns the payer address. Credits still granted via the
-  temporary `record-purchase`; Phase 4 moves granting to the verified reconciler.
+  temporary `record-purchase`; Phase 4 moves granting to the verified
+  reconciler that consumes `submitted` orders.
+- 🟡 **Phase 4 — background reconciler (§8): implemented; USDT live, NIM
+  dormant.** Scheduled function `reconcile` (`onSchedule` every 1 min,
+  `functions/src/reconciler/`) scans `submitted` orders and verifies each claimed
+  tx on-chain, then grants atomically (folds in Phase 5). **USDT** verifies via
+  raw Polygon JSON-RPC (`eth_getTransactionReceipt` + Transfer-log decode; public
+  `polygon-rpc.com` by default, override with the `POLYGON_RPC_URL` secret) — the
+  reconciler is now the **sole granter** for USDT and the client no longer
+  self-grants (watches the order doc via `onSnapshot`, shows the §12 confirming
+  UI). **NIM** verifier (`verifyNim.ts`) is written but **dormant** until
+  `NIMIQ_RPC_URL` is set (no free public Albatross RPC — see §A); until then NIM
+  keeps the temporary `record-purchase` grant, gated by the client flag
+  `NIM_SERVER_VERIFIED=false`. Grant idempotency: the reconciler writes the ledger
+  entry at `tx-<txHash>`, the SAME id `recordPurchase` uses, so USDT and legacy
+  NIM can't double-grant.
+- ✅ **Phase 5 — atomic grant (§9): done, inside the reconciler.** `grantOrder`
+  (`functions/src/orders/store.ts`) runs the re-read → txHash-keyed ledger entry →
+  balance increment → order `granted` in one `runTransaction`.
 
-**— Phases 1–3 complete (server owns identity, ledger, and payment intents).
-Remaining work replaces the client-trusted `record-purchase` with on-chain
-verification. —**
+### §A — Nimiq node RPC on GCP (the NIM dependency)
 
-- ⬜ Phase 4 — background reconciler (§8) — **blocked on on-chain RPC access.**
-  Polygon RPC key (free Alchemy/Infura) unblocks USDT verification immediately;
-  NIM needs a self-run Nimiq Albatross node (no free public RPC). Plan: verify
-  USDT first, add NIM once a node is up. See §14/notes.
-- ⬜ Phase 5 — atomic grant (§9)
+The NIM reconciler needs a JSON-RPC endpoint answering `getTransactionByHash` /
+`getBlockNumber`. There is no free public Nimiq Albatross RPC, so we host our own.
+
+- **Node type:** we only verify txs minutes old (30-min order TTL), so a **full
+  node** (light: 2 vCPU / 4 GB / 40–80 GB SSD, fast sync) should answer; a
+  **history node** (full tx index, heavy disk, slow sync) is the fallback if
+  tx-by-hash on a full node proves unreliable. **Validate on first bring-up** with
+  a `validate-nim.mjs`-style probe before flipping `NIM_SERVER_VERIFIED`.
+- **Image/config:** `ghcr.io/nimiq/core-rs-albatross`, RPC on `:8648`, enabled via
+  the `[rpc-server]` block in `client.toml` (set basic-auth user/pass).
+- **Cloud Run (investigated):** workable but the weaker option — it's stateless,
+  and the node's mmap'd DB needs real persistent storage (GCS-FUSE too slow, no
+  true mmap; Filestore NFS has mmap/lock risk + cost); always-on needs
+  `min-instances=1` + CPU-always-allocated (paid 24/7 anyway). Google routes
+  stateful always-on to GKE. Acceptable for a *full* node on a Filestore volume;
+  risky for a history node.
+- **Recommended: Compute Engine VM** — `e2-small`, 80 GB balanced PD-SSD,
+  container-optimized OS running the node container; local SSD is exactly what the
+  mmap'd chain DB wants. Cheapest reliable always-on path.
+- **Wire-up:** create Secret Manager secrets `NIMIQ_RPC_URL` (+ optional
+  `NIMIQ_RPC_USER`/`NIMIQ_RPC_PASS`), add their names to `RECONCILE_SECRETS` in
+  `functions/src/index.ts`, redeploy, then flip `NIM_SERVER_VERIFIED=true` in
+  `src/core/credits.ts`.
 
 ## Security notes
 

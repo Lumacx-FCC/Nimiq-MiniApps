@@ -10,8 +10,10 @@ import { payNim } from '@core/credits/payNim'
 import { payUsdt } from '@core/credits/payUsdt'
 import { quoteNim, quoteUsdt } from '@core/credits/pricing'
 import { getNimUsdRate } from '@core/credits/rates'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { WELCOME_CREDITS } from './config'
 import { serverUrl } from './api'
+import { getFirebaseDb } from './firebase'
 import { getSessionToken, onSessionChange } from './session'
 import { createStore, useStore } from './store'
 
@@ -23,14 +25,43 @@ export interface PurchaseRecord {
   at: string
 }
 
+/**
+ * Phase 4 — NIM stays on the temporary client record-purchase grant until our
+ * Nimiq node RPC is live and the reconciler's verifyNim is validated against it.
+ * Flip to true then, and NIM purchases take the same server-verified confirming
+ * path as USDT. USDT is already fully cut over (reconciler is the sole granter).
+ */
+const NIM_SERVER_VERIFIED = false
+
+/**
+ * Purchase state machine for the confirming-payment UI (§12). USDT session
+ * purchases are granted by the on-chain reconciler, not the client, so the flow
+ * advances submitted → confirming → granted (driven by the order doc snapshot),
+ * escalating to `slow` on a client timer only.
+ */
+export type PurchaseStatus = 'idle' | 'approving' | 'submitted' | 'confirming' | 'slow' | 'granted' | 'failed'
+
+export interface PurchaseFlow {
+  status: PurchaseStatus
+  method?: 'usdt' | 'nim'
+  credits?: number
+  amount?: number
+  txHash?: string
+  orderId?: string
+  error?: string | null
+}
+
 interface CreditsState {
   balance: number
   history: PurchaseRecord[]
   isPaying: boolean
   error: string | null
+  flow: PurchaseFlow
 }
 
-const creditsStore = createStore<CreditsState>({ balance: 0, history: [], isPaying: false, error: null })
+const IDLE_FLOW: PurchaseFlow = { status: 'idle' }
+
+const creditsStore = createStore<CreditsState>({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
 let loadedForUser: string | null = null
 
 const storageKey = (userId: string) => `${getConfig().appId}:credits:${userId}`
@@ -40,23 +71,24 @@ export function loadCreditsFor(userId: string): void {
     const raw = localStorage.getItem(storageKey(userId))
     if (!raw) {
       // First session for this account — welcome credits fund the starter renders.
-      creditsStore.set({ balance: WELCOME_CREDITS, history: [], isPaying: false, error: null })
+      creditsStore.set({ balance: WELCOME_CREDITS, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
       loadedForUser = userId
       persist()
       return
     }
     const parsed = JSON.parse(raw) as { balance: number, history: PurchaseRecord[] }
-    creditsStore.set({ balance: parsed.balance ?? 0, history: parsed.history ?? [], isPaying: false, error: null })
+    creditsStore.set({ balance: parsed.balance ?? 0, history: parsed.history ?? [], isPaying: false, error: null, flow: IDLE_FLOW })
   }
   catch {
-    creditsStore.set({ balance: 0, history: [], isPaying: false, error: null })
+    creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
   }
   loadedForUser = userId
 }
 
 export function unloadCredits(): void {
   loadedForUser = null
-  creditsStore.set({ balance: 0, history: [], isPaying: false, error: null })
+  stopWatch()
+  creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
 }
 
 function persist(): void {
@@ -220,6 +252,105 @@ async function runPurchase(fn: () => Promise<PurchaseRecord>): Promise<boolean> 
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Phase 4 — server-verified purchase (reconciler is the sole granter) */
+/* ------------------------------------------------------------------ */
+
+function setFlow(patch: Partial<PurchaseFlow>): void {
+  creditsStore.update(s => ({ ...s, flow: { ...s.flow, ...patch } }))
+}
+
+let orderUnsub: (() => void) | null = null
+let slowTimer: ReturnType<typeof setTimeout> | null = null
+
+function stopWatch(): void {
+  orderUnsub?.()
+  orderUnsub = null
+  if (slowTimer) {
+    clearTimeout(slowTimer)
+    slowTimer = null
+  }
+}
+
+/**
+ * Watch the order doc: the reconciler flips it to `granted` (or `failed`) after
+ * verifying the payment on-chain. That snapshot — not the client — drives the
+ * confirming UI to its terminal state. The 90s timer only escalates the *copy*
+ * from `confirming` to `slow`; it never grants.
+ */
+function watchOrder(orderId: string): void {
+  stopWatch()
+  slowTimer = setTimeout(() => {
+    creditsStore.update(s => (s.flow.status === 'confirming' ? { ...s, flow: { ...s.flow, status: 'slow' } } : s))
+  }, 90_000)
+
+  orderUnsub = onSnapshot(
+    doc(getFirebaseDb(), 'orders', orderId),
+    (snap) => {
+      const status = (snap.data() as { status?: string } | undefined)?.status
+      if (status === 'granted') {
+        stopWatch()
+        void authedFetch('/api/credits/balance').then(adoptServerBalance)
+        creditsStore.update((s) => {
+          const rec: PurchaseRecord = {
+            txHash: s.flow.txHash || '',
+            method: s.flow.method || 'usdt',
+            credits: s.flow.credits || 0,
+            amount: s.flow.amount || 0,
+            at: new Date().toISOString(),
+          }
+          return { ...s, isPaying: false, history: [rec, ...s.history].slice(0, 20), flow: { ...s.flow, status: 'granted' } }
+        })
+      }
+      else if (status === 'failed' || status === 'expired') {
+        stopWatch()
+        creditsStore.update(s => ({ ...s, isPaying: false, flow: { ...s.flow, status: 'failed' } }))
+      }
+    },
+    () => { /* snapshot error (offline/rules) — leave the flow; user can dismiss/retry */ },
+  )
+}
+
+/**
+ * Server-verified purchase flow (§8/§12). Create an order, pay the server-fixed
+ * amount tagging the tx with the order id, claim it, then WAIT for the on-chain
+ * reconciler to grant — the client never grants and never calls record-purchase.
+ * `isPaying` stays true through `confirming` so the pack buttons stay disabled.
+ */
+async function runServerPurchase(method: 'usdt' | 'nim', pack: CreditPack): Promise<boolean> {
+  stopWatch()
+  creditsStore.update(s => ({ ...s, isPaying: true, error: null, flow: { status: 'approving', method } }))
+  try {
+    const order = await createServerOrder(method, pack.usd)
+    setFlow({ credits: order.credits, amount: order.expectedAmount })
+
+    let txHash: string
+    let payerAddress: string | undefined
+    if (method === 'nim') {
+      txHash = await payNim(order.expectedAmount, order.orderId)
+    }
+    else {
+      const paid = await payUsdt(order.expectedAmount)
+      txHash = paid.txHash
+      payerAddress = paid.from
+    }
+
+    setFlow({ status: 'submitted', orderId: order.orderId, txHash })
+    await claimServerOrder(order.orderId, txHash, payerAddress)
+    setFlow({ status: 'confirming' })
+    watchOrder(order.orderId)
+    return true
+  }
+  catch (e) {
+    // Failure before/at payment: nothing was granted, so reset to idle with a
+    // message. A tx that actually broadcast is still reconciled server-side.
+    stopWatch()
+    const msg = e instanceof Error ? e.message : String(e)
+    creditsStore.update(s => ({ ...s, isPaying: false, error: msg, flow: { status: 'idle', error: msg } }))
+    return false
+  }
+}
+
 export const credits = {
   get balance() { return creditsStore.get().balance },
   packs: () => getConfig().packs,
@@ -243,8 +374,33 @@ export const credits = {
     const { rate, isLive } = await getNimUsdRate()
     return { ...quoteNim(pack, rate), rateIsLive: isLive }
   },
-  buyWithUsdt: (pack: CreditPack) => runPurchase(() => purchase('usdt', pack)),
-  buyWithNim: (pack: CreditPack) => runPurchase(() => purchase('nim', pack)),
+  /**
+   * USDT is fully cut over: a wallet session pays through the server-verified
+   * flow (reconciler grants). Without a session (email/Google) it falls back to
+   * the legacy client-only path.
+   */
+  async buyWithUsdt(pack: CreditPack): Promise<boolean> {
+    const token = await getSessionToken()
+    return token ? runServerPurchase('usdt', pack) : runPurchase(() => purchase('usdt', pack))
+  },
+  /**
+   * NIM stays on the temporary claim + record-purchase grant until our Nimiq
+   * node RPC is live (NIM_SERVER_VERIFIED). Then it takes the same server-
+   * verified confirming flow as USDT.
+   */
+  async buyWithNim(pack: CreditPack): Promise<boolean> {
+    if (NIM_SERVER_VERIFIED) {
+      const token = await getSessionToken()
+      if (token)
+        return runServerPurchase('nim', pack)
+    }
+    return runPurchase(() => purchase('nim', pack))
+  },
+  /** Dismiss the confirming/terminal purchase UI back to idle. */
+  resetPurchase(): void {
+    stopWatch()
+    creditsStore.update(s => ({ ...s, isPaying: false, flow: IDLE_FLOW }))
+  },
 }
 
 export function useCredits() {
@@ -255,5 +411,6 @@ export function useCredits() {
     history: state.history,
     isPaying: state.isPaying,
     error: state.error,
+    flow: state.flow,
   }
 }

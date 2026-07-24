@@ -11,8 +11,10 @@
  */
 import type { FirebaseApp } from 'firebase/app'
 import type { Auth } from 'firebase/auth'
+import type { Firestore } from 'firebase/firestore'
 import { getApp, getApps, initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBt2IHPk7eom8KOTcyH8kE65_HgnoQabug',
@@ -26,6 +28,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp | null = null
 let authInstance: Auth | null = null
+let dbInstance: Firestore | null = null
 
 export function getFirebaseApp(): FirebaseApp {
   app ??= getApps().length ? getApp() : initializeApp(firebaseConfig)
@@ -35,4 +38,13 @@ export function getFirebaseApp(): FirebaseApp {
 export function getFirebaseAuth(): Auth {
   authInstance ??= getAuth(getFirebaseApp())
   return authInstance
+}
+
+/**
+ * Firestore client, used by the Phase 4 confirming-payment UI to watch an
+ * order doc via onSnapshot (the owner-read is permitted by firestore.rules).
+ */
+export function getFirebaseDb(): Firestore {
+  dbInstance ??= getFirestore(getFirebaseApp())
+  return dbInstance
 }

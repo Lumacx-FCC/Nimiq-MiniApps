@@ -10,6 +10,7 @@
  * time-tokened download URL (the Nimiq Pay WebView download fallback).
  */
 import { onRequest } from "firebase-functions/https";
+import { onSchedule } from "firebase-functions/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions";
 import express, { type Request, type Response } from "express";
@@ -19,9 +20,21 @@ import { getStorage } from "firebase-admin/storage";
 import { handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
 import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
+import { runReconcile } from "./reconciler/reconcile.js";
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+
+// Phase 4 reconciler RPC config, read from process.env at runtime. A secret is
+// only injected into process.env when it's listed in the schedule's `secrets`
+// array below AND exists in Secret Manager, so RECONCILE_SECRETS lists only the
+// secrets that currently exist (comma-separated env RECONCILE_SECRET_NAMES set
+// at deploy). Ships empty: USDT uses the public Polygon RPC default and NIM
+// stays dormant until our Nimiq node RPC secrets are created. To enable a
+// private Polygon RPC or NIM, create the secret(s) — POLYGON_RPC_URL,
+// NIMIQ_RPC_URL, NIMIQ_RPC_USER, NIMIQ_RPC_PASS — then add their names here and
+// redeploy.
+const RECONCILE_SECRETS = ([] as string[]).map(name => defineSecret(name));
 
 if (!getApps().length) {
   initializeApp();
@@ -501,4 +514,25 @@ export const api = onRequest(
     secrets: [GEMINI_API_KEY, OPENAI_API_KEY],
   },
   app,
+);
+
+/**
+ * Phase 4 — scheduled on-chain reconciler. Every minute it verifies claimed
+ * payments against their orders and grants credits itself (the sole granter for
+ * USDT). Creating this export provisions a Cloud Scheduler job on deploy
+ * (requires the Cloud Scheduler API + Blaze).
+ */
+export const reconcile = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "256MiB",
+    secrets: RECONCILE_SECRETS,
+  },
+  async () => {
+    const summary = await runReconcile();
+    // gen2 request logs don't show return values — log so passes are visible.
+    console.log("[reconcile]", JSON.stringify(summary));
+  },
 );
