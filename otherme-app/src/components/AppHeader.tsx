@@ -18,17 +18,18 @@ export default function AppHeader({ title }: { title?: string }) {
 
   return (
     <header className="flex items-center justify-between gap-2 mb-4">
-      <Link to="/" className="flex items-center gap-2 no-underline" style={{ color: 'var(--text-100)' }}>
+      <Link to="/" className="flex items-center gap-2 no-underline min-w-0" style={{ color: 'var(--text-100)' }}>
         <img
           src={theme === 'dark' ? '/otherme-icon-dark.png' : '/otherme-icon-light.png'}
           alt="Other Me"
-          className="w-9 h-9 rounded-full"
+          className="w-9 h-9 rounded-full shrink-0"
         />
-        <span className="font-extrabold text-lg tracking-tight">{title || 'Other Me'}</span>
-        {!isHome && <Home size={16} style={{ color: 'var(--text-40)' }} aria-label={lang === 'es' ? 'Volver al inicio' : 'Back to home'} />}
+        {/* Wordmark collapses on the narrowest phones so the action chips fit. */}
+        <span className="font-extrabold text-lg tracking-tight truncate hidden min-[400px]:inline">{title || 'Other Me'}</span>
+        {!isHome && <Home size={16} className="shrink-0 hidden min-[400px]:inline" style={{ color: 'var(--text-40)' }} aria-label={lang === 'es' ? 'Volver al inicio' : 'Back to home'} />}
       </Link>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 shrink-0">
         {isLoggedIn && pathname !== '/gallery' && (
           <Link
             to="/gallery"
