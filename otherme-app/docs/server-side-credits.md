@@ -53,31 +53,83 @@ links back to the numbered sections here.
   (`functions/src/orders/store.ts`) runs the re-read → txHash-keyed ledger entry →
   balance increment → order `granted` in one `runTransaction`.
 
-### §A — Nimiq node RPC on GCP (the NIM dependency)
+### §A — Nimiq node RPC for NIM verification
 
 The NIM reconciler needs a JSON-RPC endpoint answering `getTransactionByHash` /
-`getBlockNumber`. There is no free public Nimiq Albatross RPC, so we host our own.
+`getBlockNumber`. Two options are developed **in parallel**, swappable via one
+config value (`NIMIQ_RPC_URL`), so switching between them is a secret change +
+redeploy — no code change.
 
-- **Node type:** we only verify txs minutes old (30-min order TTL), so a **full
-  node** (light: 2 vCPU / 4 GB / 40–80 GB SSD, fast sync) should answer; a
-  **history node** (full tx index, heavy disk, slow sync) is the fallback if
-  tx-by-hash on a full node proves unreliable. **Validate on first bring-up** with
-  a `validate-nim.mjs`-style probe before flipping `NIM_SERVER_VERIFIED`.
-- **Image/config:** `ghcr.io/nimiq/core-rs-albatross`, RPC on `:8648`, enabled via
-  the `[rpc-server]` block in `client.toml` (set basic-auth user/pass).
-- **Cloud Run (investigated):** workable but the weaker option — it's stateless,
-  and the node's mmap'd DB needs real persistent storage (GCS-FUSE too slow, no
-  true mmap; Filestore NFS has mmap/lock risk + cost); always-on needs
-  `min-instances=1` + CPU-always-allocated (paid 24/7 anyway). Google routes
-  stateful always-on to GKE. Acceptable for a *full* node on a Filestore volume;
-  risky for a history node.
-- **Recommended: Compute Engine VM** — `e2-small`, 80 GB balanced PD-SSD,
-  container-optimized OS running the node container; local SSD is exactly what the
-  mmap'd chain DB wants. Cheapest reliable always-on path.
-- **Wire-up:** create Secret Manager secrets `NIMIQ_RPC_URL` (+ optional
-  `NIMIQ_RPC_USER`/`NIMIQ_RPC_PASS`), add their names to `RECONCILE_SECRETS` in
-  `functions/src/index.ts`, redeploy, then flip `NIM_SERVER_VERIFIED=true` in
-  `src/core/credits.ts`.
+- **INTERIM (current default): public NimiqWatch RPC** `https://rpc.nimiqwatch.com`
+  — set as `NIMIQ_RPC_DEFAULT` in `functions/src/config.ts`, used when
+  `NIMIQ_RPC_URL` is unset. NimiqWatch runs a history node, so it answers
+  `getTransactionByHash` for older txs. In use until the tech team confirms the
+  NIM/USDT setup and our own node is up.
+- **TARGET (pending tech-team confirmation): self-hosted Compute Engine VM**
+  (`e2-small`/`e2-medium`). Set the `NIMIQ_RPC_URL` secret to the VM's URL to
+  override the public default.
+
+**Client stays on the instant record-purchase grant for NIM** (`NIM_SERVER_VERIFIED
+= false` in `src/core/credits.ts`) — the reconciler verification runs in the
+**background** and is **idempotent** with it (ledger entry keyed `tx-<hash>`), so a
+flaky/absent RPC never blocks a NIM purchase. Flip `NIM_SERVER_VERIFIED = true`
+for the full cutover (client waits for the reconciler) only once the node is up
+and validated.
+
+**RPC response shape (locked, do not "fix" casually):** Albatross RPC
+`Transaction` (core-rs-albatross `rpc-interface/src/types.rs`, serde
+`rename_all = camelCase`): `to` (NQ address), `value` (Luna number),
+`recipientData` (hex bytes — carries our `otherme:<orderId>` tag),
+`confirmations` (number once mined). `verifyNim.ts` reads exactly these; confirm
+against the live endpoint with `functions/scripts/validate-nim.mjs <txHash>` on a
+clean network before trusting it.
+
+#### Risk & cost comparison
+
+| | Public RPC (NimiqWatch) — interim | Self-hosted VM (e2-small/medium) — target |
+|---|---|---|
+| **Direct cost** | **$0** | **~$20–35/mo** (e2-small ~$13 + 80 GB PD-SSD ~$8 + external IP ~$3; e2-medium ~$25 for 4 GB RAM) |
+| **Ops burden** | none | we run/patch/monitor the node; sync health, disk growth, OOM, restarts |
+| **Trust/security** | ⚠️ third party reports on-chain truth — a compromised/wrong RPC could confirm a fake payment → free credits. Tolerable for test amounts; **not** for production real money. Mitigated now because the client already grants NIM (record-purchase) and the reconciler is only a background check. | ✅ we control the node; trust anchored in our own consensus. Production-grade. |
+| **Availability/SLA** | ⚠️ no guarantee; can go down, rate-limit, or be withdrawn without notice. If down: NIM orders sit `submitted`, marked `failed` after the grace window (cosmetic only — credits already granted client-side in the interim). | single VM = single point of failure, but under our control (restart policy, monitoring). |
+| **Data completeness** | history node (explorer) → answers tx-by-hash for old txs. Not contractual. | history node → reliable; **must be history, not full** (full node may not index arbitrary tx-by-hash). |
+| **ToS / rate limits** | ⚠️ commercial use may be unsanctioned; unknown limits. Our volume is tiny (~1 call/min + per-order lookups). | none |
+| **Setup effort** | zero (already wired) | provision VM + Docker + sync (history sync can take hours) |
+
+**Bottom line:** NimiqWatch is fine as a **zero-cost interim, low-risk** because
+NIM grants don't depend on it yet (background check only). For **production**,
+move to the self-hosted VM to remove the third-party trust + availability
+dependency — especially before real money / `NIM_SERVER_VERIFIED = true`.
+
+#### VM setup (e2-small, when confirmed)
+
+1. **Instance:** `e2-small` (2 vCPU / 2 GB) minimum; **`e2-medium` (4 GB)** to
+   meet Nimiq's 4 GB rec — history sync is memory-hungry. Boot: Container-Optimized
+   OS. Disk: **100 GB+ balanced PD-SSD** (history grows; size with headroom).
+   Region `us-central1` (same as the functions, low latency).
+2. **Firewall:** allow the functions' egress to `:8648` only. Simplest safe path:
+   keep the node on a **private IP** reachable over the VPC, or a public IP with a
+   firewall rule allowlisting Google's egress + **basic auth on the RPC**. Never
+   expose `:8648` open to the internet unauthenticated.
+3. **Run the node** (`ghcr.io/nimiq/core-rs-albatross`) with a `client.toml`:
+   `sync_mode = "history"`, and a `[rpc-server]` block enabled binding
+   `0.0.0.0:8648` with a username/password. Mount the data dir on the PD-SSD.
+   Use Docker `--restart=always` (or a systemd unit) so it survives reboots.
+4. **Wait for consensus** (history sync can take hours); confirm with
+   `getBlockNumber` and a real `getTransactionByHash` via
+   `validate-nim.mjs <txHash> http://<vm>:8648`.
+5. **Point the reconciler at it:** create Secret Manager secrets `NIMIQ_RPC_URL`
+   (+ `NIMIQ_RPC_USER` / `NIMIQ_RPC_PASS`), add their names to `RECONCILE_SECRETS`
+   in `functions/src/index.ts`, redeploy functions. The secret overrides the
+   public default.
+6. **(Optional) Full cutover:** once stable, flip `NIM_SERVER_VERIFIED = true` so
+   the client waits for the reconciler (confirming UI) instead of instant-granting.
+
+*(Cloud Run was assessed and rejected for the node: it's stateless, the node's
+mmap'd DB needs real persistent storage — GCS-FUSE too slow, Filestore NFS
+mmap/lock risk + cost — and always-on needs `min-instances=1` + CPU-always-
+allocated, i.e. paid 24/7 anyway. Google routes stateful always-on to GKE. A VM
+with a local SSD is simpler and cheaper.)*
 
 ## Security notes
 

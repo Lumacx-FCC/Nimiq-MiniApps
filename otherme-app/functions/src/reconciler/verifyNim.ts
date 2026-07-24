@@ -1,11 +1,11 @@
 /**
  * Verify a claimed NIM payment against its order (Phase 4, §8).
  *
- * DORMANT until NIMIQ_RPC_URL is set (there is no free public Nimiq Albatross
- * RPC — we stand up our own node; see docs/server-side-credits.md §A). Until
- * then NIM keeps the temporary client record-purchase grant. The exact RPC
- * response field names are finalized against the live node on first bring-up
- * (validate-nim.mjs), so recipient/data are read defensively here.
+ * Verifies against NIMIQ_RPC_URL (our node) or the public NimiqWatch default
+ * (interim; see docs/server-side-credits.md §A). Response shape matches the
+ * Albatross RPC `Transaction` type (core-rs-albatross rpc-interface/src/types.rs,
+ * serde rename_all = camelCase): `to` (NQ address), `value` (Luna number),
+ * `recipientData` (hex bytes), `confirmations` (number, once mined).
  *
  * The client pays payNim(amount, orderId) which tags the tx data with
  * `${appId}:${orderId}` — exactly order.reference — so we match on that tag,
@@ -19,11 +19,8 @@ import type { VerifyResult } from "./verify.js";
 
 interface NimTx {
   to?: string;
-  toAddress?: string;
-  recipient?: string;
-  value?: number;
-  data?: string;
-  recipientData?: string;
+  value?: number | string; // Coin → number (Luna); coerced defensively
+  recipientData?: string; // hex-encoded data bytes
   blockNumber?: number;
   confirmations?: number;
 }
@@ -31,17 +28,13 @@ interface NimTx {
 /** Normalize an NQ address for comparison (drop spaces, upper-case). */
 const normAddr = (a: string | undefined) => (a ?? "").replace(/\s+/g, "").toUpperCase();
 
-/** Decode the on-chain data field to a string (hex or already-utf8). */
+/** Decode the hex-encoded recipientData to its utf8 string (the `appId:orderId` tag). */
 function decodeData(raw: string | undefined): string {
   if (!raw)
     return "";
   const hex = raw.startsWith("0x") ? raw.slice(2) : raw;
-  if (/^[0-9a-fA-F]+$/.test(hex) && hex.length % 2 === 0) {
-    const utf8 = Buffer.from(hex, "hex").toString("utf8");
-    // Prefer the decoded form when it looks like our `appId:orderId` tag.
-    if (utf8.includes(":"))
-      return utf8;
-  }
+  if (/^[0-9a-fA-F]+$/.test(hex) && hex.length % 2 === 0)
+    return Buffer.from(hex, "hex").toString("utf8");
   return raw;
 }
 
@@ -54,16 +47,17 @@ export async function verifyNim(order: OrderWithId, rpcUrl: string, auth?: RpcOp
   if (!tx)
     return { state: "pending", reason: "tx not in history yet" };
 
-  const recipient = normAddr(tx.to ?? tx.toAddress ?? tx.recipient);
+  const recipient = normAddr(tx.to);
   if (recipient !== normAddr(NIM_TREASURY_ADDRESS))
     return { state: "mismatch", reason: `wrong recipient ${recipient}` };
 
   // Freeze-and-require with a 1% floor for rounding drift (§7/§13).
+  const value = Number(tx.value);
   const minValue = Math.floor(order.expectedBaseUnits * 0.99);
-  if (typeof tx.value !== "number" || tx.value < minValue)
+  if (!Number.isFinite(value) || value < minValue)
     return { state: "mismatch", reason: `value ${tx.value} < ${minValue}` };
 
-  const data = decodeData(tx.data ?? tx.recipientData);
+  const data = decodeData(tx.recipientData);
   if (data !== order.reference)
     return { state: "mismatch", reason: `reference "${data}" != "${order.reference}"` };
 
