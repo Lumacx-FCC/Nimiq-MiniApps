@@ -4,7 +4,7 @@
  * per video; up to 3 free conversational edits refine the same clip through
  * previous_interaction_id. Gallery persists in IndexedDB.
  */
-import { Download, MessageSquarePlus, RefreshCw, Save, Trash2, Video, Wand2 } from 'lucide-react'
+import { Download, MessageSquarePlus, RefreshCw, Save, Share2, Trash2, Video, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
@@ -13,7 +13,7 @@ import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { VIDEO_CREDITS, VIDEO_MAX_EDITS } from '../core/config'
 import { compileVideoPrompt } from '../character/fields'
-import { downloadDataUrl, listSheets } from '../character/library'
+import { downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, SavedVideo, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
@@ -44,6 +44,7 @@ const COPY = {
     editsExhausted: 'All 3 edits used — generate a new video to continue.',
     save: 'Save',
     saved: 'Saved to your video gallery',
+    share: 'Share',
     download: 'Download',
     gallery: 'My videos',
     empty: 'No videos yet — describe an action above and generate.',
@@ -68,6 +69,7 @@ const COPY = {
     editsExhausted: 'Las 3 ediciones usadas — genera un nuevo video para continuar.',
     save: 'Guardar',
     saved: 'Guardado en tu galería de videos',
+    share: 'Compartir',
     download: 'Descargar',
     gallery: 'Mis videos',
     empty: 'Aún no hay videos — describe una acción arriba y genera.',
@@ -116,6 +118,18 @@ export default function Videos() {
   const [gallery, setGallery] = useState<SavedVideo[]>([])
   const [savedScenes, setSavedScenes] = useState<SavedScene[]>([])
   const [notice, setNotice] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
+  // Which video is being shared (re-encoding the footer runs ~clip length).
+  const [sharingKey, setSharingKey] = useState<string | null>(null)
+
+  async function shareVideo(dataUrl: string, filename: string, key: string): Promise<void> {
+    setSharingKey(key)
+    try {
+      await shareDataUrl(dataUrl, filename, { footer: true })
+    }
+    finally {
+      setSharingKey(null)
+    }
+  }
 
   useEffect(() => {
     if (!isLoggedIn)
@@ -268,6 +282,9 @@ export default function Videos() {
               <div className="flex gap-2 mt-3 flex-wrap">
                 <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={saveVideo}><Save size={15} />{t.save}</button>
                 <button className="icon-chip" onClick={() => downloadDataUrl(current.dataUrl, 'otherme-video.mp4')}><Download size={14} />{t.download}</button>
+                <button className="icon-chip" disabled={sharingKey === 'current'} onClick={() => void shareVideo(current.dataUrl, 'otherme-video.mp4', 'current')}>
+                  {sharingKey === 'current' ? <RefreshCw size={14} className="animate-spin" /> : <Share2 size={14} />}{t.share}
+                </button>
               </div>
 
               <div className="mt-4">
@@ -311,6 +328,9 @@ export default function Videos() {
                     {video.characterName && <p className="text-[10px] m-0" style={{ color: 'var(--text-40)' }}>{video.characterName}</p>}
                   </div>
                   <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" onClick={() => downloadDataUrl(video.videoDataUrl, `${video.name.replace(/\s+/g, '-')}.mp4`)}><Download size={12} /></button>
+                  <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" disabled={sharingKey === video.id} onClick={() => void shareVideo(video.videoDataUrl, `${video.name.replace(/\s+/g, '-')}.mp4`, video.id)}>
+                    {sharingKey === video.id ? <RefreshCw size={12} className="animate-spin" /> : <Share2 size={12} />}
+                  </button>
                   <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" onClick={() => void removeVideo(video.id)}><Trash2 size={12} style={{ color: 'var(--nimiq-red)' }} /></button>
                 </div>
               </div>

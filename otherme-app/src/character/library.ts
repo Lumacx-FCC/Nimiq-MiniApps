@@ -105,22 +105,32 @@ async function shareViaBrowserLink(blob: Blob, filename: string): Promise<void> 
     headers: { 'Content-Type': blob.type || 'application/octet-stream', 'X-Filename': encodeURIComponent(filename) },
     body: blob,
   })
-  const json = await response.json() as { url?: string, error?: string }
+  const json = await response.json() as { url?: string, error?: string, expiresInMinutes?: number }
   if (!response.ok || !json.url)
     throw new Error(json.error || 'Could not create download link')
   // Prod (Cloud Function) returns an absolute Firebase Storage URL; the dev
   // Vite middleware returns a relative /api/share/:id path.
   const link = json.url.startsWith('http') ? json.url : `${window.location.origin}${json.url}`
-  showBrowserLinkOverlay(link, filename)
+  showBrowserLinkOverlay(link, filename, json.expiresInMinutes ?? 30)
 }
 
-function showBrowserLinkOverlay(url: string, filename: string): void {
+/** Human expiry string from minutes (dev share = 30 min, prod = 24 h). */
+function expiryLabel(minutes: number, es: boolean): string {
+  if (minutes >= 60) {
+    const hours = Math.round(minutes / 60)
+    return es ? `${hours} ${hours === 1 ? 'hora' : 'horas'}` : `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+  }
+  return es ? `${minutes} minutos` : `${minutes} minutes`
+}
+
+function showBrowserLinkOverlay(url: string, filename: string, expiresInMinutes: number): void {
   const es = localStorage.getItem('otherme:lang') === 'es'
+  const expiry = expiryLabel(expiresInMinutes, es)
   const copy = {
     title: es ? 'Descargar en tu navegador' : 'Download in your browser',
     body: es
-      ? `Nimiq Pay aún no permite guardar archivos directamente. Copia este enlace y ábrelo en el navegador de tu teléfono (Chrome) para descargar «${filename}». El enlace expira en 30 minutos.`
-      : `Nimiq Pay can't save files directly yet. Copy this link and open it in your phone's browser (Chrome) to download “${filename}”. The link expires in 30 minutes.`,
+      ? `Nimiq Pay aún no permite guardar archivos directamente. Copia este enlace y ábrelo en el navegador de tu teléfono (Chrome) para descargar «${filename}». El enlace expira en ${expiry}.`
+      : `Nimiq Pay can't save files directly yet. Copy this link and open it in your phone's browser (Chrome) to download “${filename}”. The link expires in ${expiry}.`,
     copyLabel: es ? 'Copiar enlace' : 'Copy link',
     copied: es ? '¡Copiado!' : 'Copied!',
     close: es ? 'Cerrar' : 'Close',
@@ -166,18 +176,28 @@ function showBrowserLinkOverlay(url: string, filename: string): void {
   document.body.appendChild(overlay)
 }
 
-async function shareOrDownloadBlob(blob: Blob, filename: string): Promise<void> {
+/** Attribution added to shared assets so reshares point back to the app. */
+export const SHARE_CAPTION = 'Created on OtherMeApp.com'
+export const SHARE_URL = 'https://othermeapp.com'
+
+async function shareOrDownloadBlob(blob: Blob, filename: string, share?: { text?: string, url?: string }): Promise<void> {
   // Preferred: the native share sheet (real mobile browsers).
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' })
-  if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: filename })
-      return
-    }
-    catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError')
-        return // user closed the share sheet
-      // Share unavailable after all — fall through.
+  if (typeof navigator.canShare === 'function') {
+    // Try to include the attribution text/url; some platforms reject files+url
+    // together, so fall back to files-only.
+    const full = { files: [file], title: filename, ...(share || {}) }
+    const payload = navigator.canShare(full) ? full : (navigator.canShare({ files: [file] }) ? { files: [file], title: filename } : null)
+    if (payload) {
+      try {
+        await navigator.share(payload)
+        return
+      }
+      catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError')
+          return // user closed the share sheet
+        // Share unavailable after all — fall through.
+      }
     }
   }
   // The Nimiq Pay WebView supports neither Web Share nor anchor downloads:
@@ -190,6 +210,147 @@ async function shareOrDownloadBlob(blob: Blob, filename: string): Promise<void> 
     catch { /* server unreachable — try the anchor as a last resort */ }
   }
   anchorDownload(blob, filename)
+}
+
+/**
+ * Burn a small attribution footer onto an image data URL (canvas composite).
+ * Reused for shared scenes/character sheets so the image itself carries the
+ * "Created on OtherMeApp.com" credit. Returns the original on any failure.
+ */
+async function burnFooter(dataUrl: string, caption: string): Promise<string> {
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image()
+      element.onload = () => resolve(element)
+      element.onerror = () => reject(new Error('decode'))
+      element.src = dataUrl
+    })
+    const w = image.naturalWidth
+    const h = image.naturalHeight
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx)
+      return dataUrl
+    ctx.drawImage(image, 0, 0, w, h)
+    const barH = Math.max(24, Math.round(h * 0.06))
+    const fontPx = Math.round(barH * 0.5)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, h - barH, w, barH)
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'
+    ctx.font = `600 ${fontPx}px system-ui, sans-serif`
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'center'
+    ctx.fillText(caption, w / 2, h - barH / 2)
+    return canvas.toDataURL('image/webp', 0.9)
+  }
+  catch {
+    return dataUrl
+  }
+}
+
+/** The best MediaRecorder container this engine can produce (prefer mp4). */
+function pickVideoMime(): string | null {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function')
+    return null
+  const candidates = ['video/mp4;codecs=h264,aac', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm']
+  return candidates.find(m => MediaRecorder.isTypeSupported(m)) ?? null
+}
+
+/**
+ * Re-encode a video data URL with the attribution footer burned onto every
+ * frame (canvas compositing → MediaRecorder), preserving the source audio.
+ * Runs in real time (playback duration — clips are ~8s). Returns null when the
+ * platform can't record, so the caller shares the original clip + link instead.
+ */
+async function burnVideoFooter(dataUrl: string, caption: string): Promise<{ blob: Blob, ext: string } | null> {
+  const mime = pickVideoMime()
+  const canCapture = typeof HTMLCanvasElement !== 'undefined'
+    && typeof (HTMLCanvasElement.prototype as unknown as { captureStream?: unknown }).captureStream === 'function'
+  if (!mime || !canCapture)
+    return null
+  try {
+    const video = document.createElement('video')
+    video.src = dataUrl
+    video.playsInline = true
+    video.crossOrigin = 'anonymous'
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve()
+      video.onerror = () => reject(new Error('video decode'))
+    })
+    const w = video.videoWidth
+    const h = video.videoHeight
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx)
+      return null
+
+    const barH = Math.max(24, Math.round(h * 0.06))
+    const fontPx = Math.round(barH * 0.5)
+
+    const canvasStream = (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(30)
+    let audioTracks: MediaStreamTrack[] = []
+    try {
+      const srcStream = (video as unknown as { captureStream?: () => MediaStream }).captureStream?.()
+      audioTracks = srcStream ? srcStream.getAudioTracks() : []
+    }
+    catch { /* clip has no audio / capture unsupported */ }
+    const combined = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks])
+
+    const recorder = new MediaRecorder(combined, { mimeType: mime })
+    const chunks: BlobPart[] = []
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data) }
+    const recorded = new Promise<Blob>((resolve) => { recorder.onstop = () => resolve(new Blob(chunks, { type: mime })) })
+
+    recorder.start()
+    await video.play()
+    const draw = (): void => {
+      ctx.drawImage(video, 0, 0, w, h)
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'
+      ctx.fillRect(0, h - barH, w, barH)
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'
+      ctx.font = `600 ${fontPx}px system-ui, sans-serif`
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'center'
+      ctx.fillText(caption, w / 2, h - barH / 2)
+      if (!video.ended)
+        requestAnimationFrame(draw)
+    }
+    requestAnimationFrame(draw)
+    await new Promise<void>((resolve) => { video.onended = () => resolve() })
+    recorder.stop()
+    const blob = await recorded
+    return { blob, ext: mime.startsWith('video/mp4') ? 'mp4' : 'webm' }
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * Share a saved asset via the native share sheet (with an OtherMe attribution
+ * link), falling back to the WebView browser-link overlay / anchor download.
+ * With `footer: true` the attribution is burned onto the pixels — directly for
+ * images, and re-encoded onto every frame for videos (falls back to the
+ * original clip + link text if the platform can't re-encode).
+ */
+export async function shareDataUrl(dataUrl: string, filename: string, opts?: { footer?: boolean }): Promise<void> {
+  const isVideo = dataUrl.startsWith('data:video')
+  if (opts?.footer && isVideo) {
+    const burned = await burnVideoFooter(dataUrl, SHARE_CAPTION)
+    if (burned) {
+      const vname = filename.replace(/\.\w+$/, `.${burned.ext}`)
+      await shareOrDownloadBlob(burned.blob, vname, { text: SHARE_CAPTION, url: SHARE_URL })
+      return
+    }
+    // fall through: share the original clip + link text
+  }
+  const source = (opts?.footer && !isVideo) ? await burnFooter(dataUrl, SHARE_CAPTION) : dataUrl
+  const blob = await (await fetch(source)).blob()
+  await shareOrDownloadBlob(blob, filename, { text: SHARE_CAPTION, url: SHARE_URL })
 }
 
 export function downloadDataUrl(dataUrl: string, filename: string): void {

@@ -236,7 +236,13 @@ export async function grantOrder(orderId: string): Promise<{ granted: boolean; r
         note: `${order.expectedAmount} ${order.method} (verified)`,
       });
     }
-    tx.update(ref, { status: "granted", grantedAt: Date.now(), lastCheckedAt: Date.now() });
+    tx.update(ref, {
+      status: "granted",
+      grantedAt: Date.now(),
+      lastCheckedAt: Date.now(),
+      // Clear any stale failure reason from an earlier (e.g. pre-fix) mismatch.
+      failedReason: FieldValue.delete(),
+    });
     return { granted: !alreadyRecorded };
   });
 }
