@@ -5,7 +5,7 @@
 import { X } from 'lucide-react'
 import { useState } from 'react'
 
-export default function Lightbox({ src, alt, onClose }: { src: string, alt: string, onClose: () => void }) {
+export default function Lightbox({ src, alt, kind = 'image', onClose }: { src: string, alt: string, kind?: 'image' | 'video', onClose: () => void }) {
   const [zoomed, setZoomed] = useState(false)
   return (
     <div
@@ -25,12 +25,25 @@ export default function Lightbox({ src, alt, onClose }: { src: string, alt: stri
         <X size={20} />
       </button>
       <div className="min-h-full w-full flex items-center justify-center p-4">
-        <img
-          src={src}
-          alt={alt}
-          className={zoomed ? 'cursor-zoom-out max-w-none w-[190%] sm:w-[150%] h-auto' : 'cursor-zoom-in max-w-full max-h-[92vh] object-contain'}
-          onClick={(event) => { event.stopPropagation(); setZoomed(!zoomed) }}
-        />
+        {kind === 'video'
+          ? (
+              <video
+                src={src}
+                controls
+                autoPlay
+                playsInline
+                className="max-w-full max-h-[92vh] rounded-xl"
+                onClick={event => event.stopPropagation()}
+              />
+            )
+          : (
+              <img
+                src={src}
+                alt={alt}
+                className={zoomed ? 'cursor-zoom-out max-w-none w-[190%] sm:w-[150%] h-auto' : 'cursor-zoom-in max-w-full max-h-[92vh] object-contain'}
+                onClick={(event) => { event.stopPropagation(); setZoomed(!zoomed) }}
+              />
+            )}
       </div>
     </div>
   )

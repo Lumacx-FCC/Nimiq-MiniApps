@@ -4,8 +4,8 @@
  * per video; up to 3 free conversational edits refine the same clip through
  * previous_interaction_id. Gallery persists in IndexedDB.
  */
-import { Download, MessageSquarePlus, RefreshCw, Save, Share2, Trash2, Video, Wand2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Camera, Download, MessageSquarePlus, RefreshCw, Save, Share2, Trash2, Video, Wand2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
@@ -13,7 +13,7 @@ import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { VIDEO_CREDITS, VIDEO_MAX_EDITS } from '../core/config'
 import { compileVideoPrompt } from '../character/fields'
-import { downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
+import { compressImageDataUrl, downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, SavedVideo, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
@@ -46,6 +46,9 @@ const COPY = {
     saved: 'Saved to your video gallery',
     share: 'Share',
     download: 'Download',
+    snapshot: 'Snapshot',
+    snapshotName: 'Snapshot',
+    snapshotSaved: 'Frame saved to your scenes — use it as a reference anytime.',
     gallery: 'My videos',
     empty: 'No videos yet — describe an action above and generate.',
     failed: 'Video generation failed',
@@ -71,6 +74,9 @@ const COPY = {
     saved: 'Guardado en tu galería de videos',
     share: 'Compartir',
     download: 'Descargar',
+    snapshot: 'Captura',
+    snapshotName: 'Captura',
+    snapshotSaved: 'Fotograma guardado en tus escenas — úsalo como referencia cuando quieras.',
     gallery: 'Mis videos',
     empty: 'Aún no hay videos — describe una acción arriba y genera.',
     failed: 'Falló la generación del video',
@@ -120,6 +126,7 @@ export default function Videos() {
   const [notice, setNotice] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
   // Which video is being shared (re-encoding the footer runs ~clip length).
   const [sharingKey, setSharingKey] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   async function shareVideo(dataUrl: string, filename: string, key: string): Promise<void> {
     setSharingKey(key)
@@ -129,6 +136,37 @@ export default function Videos() {
     finally {
       setSharingKey(null)
     }
+  }
+
+  /**
+   * Capture the current video frame (pause first for a clean grab) and save it
+   * as a Scene — so a great still becomes a reusable reference for another video
+   * or a scene edit. Same-origin data URL → canvas is taint-free.
+   */
+  async function snapshot(): Promise<void> {
+    const v = videoRef.current
+    if (!v || !v.videoWidth)
+      return
+    v.pause()
+    const canvas = document.createElement('canvas')
+    canvas.width = v.videoWidth
+    canvas.height = v.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx)
+      return
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+    const imageDataUrl = await compressImageDataUrl(canvas.toDataURL('image/webp', 0.92))
+    const scene: SavedScene = {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name: `${t.snapshotName} ${new Date().toLocaleTimeString()}`,
+      characterName: null,
+      prompt: action.trim() || 'Video snapshot',
+      imageDataUrl,
+      savedAt: new Date().toISOString(),
+    }
+    await saveMedia('scenes', scene)
+    setSavedScenes(await listMedia<SavedScene>('scenes'))
+    setNotice({ text: t.snapshotSaved, type: 'success' })
   }
 
   useEffect(() => {
@@ -278,13 +316,14 @@ export default function Videos() {
           {current && (
             <section className="om-card">
               <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.result}</h2>
-              <video src={current.dataUrl} controls className="w-full rounded-xl shadow-lg" />
+              <video ref={videoRef} src={current.dataUrl} controls playsInline className="w-full rounded-xl shadow-lg" />
               <div className="flex gap-2 mt-3 flex-wrap">
                 <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={saveVideo}><Save size={15} />{t.save}</button>
                 <button className="icon-chip" onClick={() => downloadDataUrl(current.dataUrl, 'otherme-video.mp4')}><Download size={14} />{t.download}</button>
                 <button className="icon-chip" disabled={sharingKey === 'current'} onClick={() => void shareVideo(current.dataUrl, 'otherme-video.mp4', 'current')}>
                   {sharingKey === 'current' ? <RefreshCw size={14} className="animate-spin" /> : <Share2 size={14} />}{t.share}
                 </button>
+                <button className="icon-chip" onClick={() => void snapshot()} title={t.snapshot}><Camera size={14} />{t.snapshot}</button>
               </div>
 
               <div className="mt-4">
