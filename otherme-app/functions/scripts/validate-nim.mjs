@@ -46,6 +46,9 @@ function runOffline() {
   return ok;
 }
 
+/** Albatross RPC wraps results as { data, metadata } — unwrap to the payload. */
+const unwrap = res => (res && typeof res === 'object' && 'data' in res ? res.data : res);
+
 async function rpc(url, method, params) {
   const res = await fetch(url, {
     method: 'POST',
@@ -55,7 +58,7 @@ async function rpc(url, method, params) {
   const body = await res.json();
   if (body.error)
     throw new Error(`${method}: ${JSON.stringify(body.error)}`);
-  return body.result;
+  return unwrap(body.result);
 }
 
 async function runLive(txHash, url) {
@@ -90,7 +93,9 @@ async function main() {
   else {
     console.log(`(pass a NIM txHash to live-probe ${DEFAULT_RPC} and confirm the response shape)`);
   }
-  process.exit(offlineOk ? 0 : 1);
+  // Set exit code without process.exit() — a hard exit while the fetch keepalive
+  // socket is still closing triggers a benign libuv assertion on Windows.
+  process.exitCode = offlineOk ? 0 : 1;
 }
 
 main();
