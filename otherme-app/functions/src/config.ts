@@ -16,6 +16,28 @@ export const USDT_DECIMALS = 6;
 /** How long an order can be paid before it expires. */
 export const ORDER_TTL_MS = 30 * 60 * 1000;
 
+/* ------------------------------------------------------------------ */
+/* Phase 4 — on-chain reconciler                                       */
+/* ------------------------------------------------------------------ */
+
+/** USDT (PoS) contract on Polygon — the token the client transfers to us. */
+export const USDT_POLYGON_CONTRACT = "0xc2132d05d31c914a87c6611c10748aeb04b58e8f";
+/** keccak256("Transfer(address,address,uint256)") — ERC-20 Transfer log topic. */
+export const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+/** Public Polygon RPC used when POLYGON_RPC_URL is unset. */
+export const POLYGON_RPC_DEFAULT = "https://polygon-rpc.com";
+
+/** Confirmation depth before a payment is considered final (reorg safety). */
+export const CONFIRMATIONS_USDT = 5;
+export const CONFIRMATIONS_NIM = 5;
+
+/** Reconciler bounds: give up after this many checks or once past the grace. */
+export const RECONCILE_MAX_ATTEMPTS = 40;
+/** How long after submission to keep retrying before marking an order failed. */
+export const RECONCILE_GRACE_MS = 20 * 60 * 1000;
+/** Orders processed per scheduled pass. */
+export const RECONCILE_BATCH = 25;
+
 /** App id used in the NIM transaction data tag (`<appId>:<orderId>`). */
 export const APP_ID = "otherme";
 

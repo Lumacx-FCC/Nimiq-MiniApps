@@ -13,7 +13,7 @@
  * client-supplied amount) and freezes it into the order. Phase 4's reconciler
  * verifies the claimed tx against these fields on-chain.
  */
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import {
   APP_ID,
   EVM_TREASURY_ADDRESS,
@@ -45,6 +45,14 @@ export interface OrderDoc {
   createdAt: number;
   expiresAt: number;
   submittedAt?: number;
+  lastCheckedAt?: number;
+  grantedAt?: number;
+  failedReason?: string;
+}
+
+/** An order joined with its Firestore id — what the reconciler works with. */
+export interface OrderWithId extends OrderDoc {
+  id: string;
 }
 
 export interface OrderView {
@@ -131,5 +139,91 @@ export async function claimOrder(
       submittedAt: Date.now(),
     });
     return { ok: true };
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 4 — reconciler helpers                                        */
+/* ------------------------------------------------------------------ */
+
+// Mirrors credits/store.ts: ledger_entries/{address}/entries/{id}. The entry
+// doc id is `tx-<txHash>`, the SAME convention recordPurchase uses, so a grant
+// is idempotent across both the reconciler and the legacy client path.
+const entriesRef = (address: string) =>
+  getFirestore().collection("ledger_entries").doc(address).collection("entries");
+
+/** The oldest `submitted` orders awaiting on-chain verification. */
+export async function listSubmittedOrders(limit: number): Promise<OrderWithId[]> {
+  const snap = await orders()
+    .where("status", "==", "submitted")
+    .orderBy("submittedAt", "asc")
+    .limit(limit)
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as OrderDoc) }));
+}
+
+/** Advance an order's status, tracking the attempt for retry/backoff bounds. */
+export async function setOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  extra: Partial<Pick<OrderDoc, "failedReason">> = {},
+): Promise<void> {
+  await orders().doc(orderId).update({
+    status,
+    attempts: FieldValue.increment(1),
+    lastCheckedAt: Date.now(),
+    ...extra,
+  });
+}
+
+/** Record a check that neither confirmed nor failed the order (keep retrying). */
+export async function touchOrder(orderId: string): Promise<void> {
+  await orders().doc(orderId).update({
+    attempts: FieldValue.increment(1),
+    lastCheckedAt: Date.now(),
+  });
+}
+
+/**
+ * Atomic grant (folds in Phase 5). In one transaction: re-read the order, append
+ * the txHash-keyed ledger entry, increment the user's balance, and mark the
+ * order `granted`. Idempotent — a second run (or a race with the legacy
+ * record-purchase) is a no-op because the ledger entry already exists and the
+ * order is already `granted`.
+ */
+export async function grantOrder(orderId: string): Promise<{ granted: boolean; reason?: string }> {
+  const ref = orders().doc(orderId);
+  return getFirestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists)
+      return { granted: false, reason: "order gone" };
+    const order = snap.data() as OrderDoc;
+    if (order.status === "granted")
+      return { granted: false, reason: "already granted" };
+    if (!order.txHash)
+      return { granted: false, reason: "no txHash" };
+
+    const entryDoc = entriesRef(order.userId).doc(`tx-${order.txHash}`);
+    const entrySnap = await tx.get(entryDoc);
+    const alreadyRecorded = entrySnap.exists;
+
+    if (!alreadyRecorded) {
+      tx.set(
+        getFirestore().collection("users").doc(order.userId),
+        { nimAddress: order.userId, balance: FieldValue.increment(order.credits) },
+        { merge: true },
+      );
+      tx.set(entryDoc, {
+        delta: order.credits,
+        kind: "purchase",
+        at: Date.now(),
+        txHash: order.txHash,
+        method: order.method,
+        orderId,
+        note: `${order.expectedAmount} ${order.method} (verified)`,
+      });
+    }
+    tx.update(ref, { status: "granted", grantedAt: Date.now(), lastCheckedAt: Date.now() });
+    return { granted: !alreadyRecorded };
   });
 }

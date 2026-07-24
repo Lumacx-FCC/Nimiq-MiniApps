@@ -27,6 +27,31 @@ function getEthereum() {
 }
 
 /**
+ * Stable error code thrown when a USDT transfer fails because the wallet has no
+ * native gas token (POL, formerly MATIC) on Polygon.
+ *
+ * NOTE (2026-07-23): Nimiq Pay mini apps get NO gas abstraction — the gasless
+ * USDT experience is native-wallet-only, and `eth_sendTransaction` follows
+ * standard EVM gas rules, so the user must hold POL. There is no in-app fix
+ * (Polygon USDT has no permit/EIP-3009 for a relayer). We surface a clear
+ * message and steer users to NIM (gasless + bonus). TODO: revisit — either
+ * validate this UX on-device or drop the USDT rail entirely (as NimBomber and
+ * other Nimiq mini apps do, going NIM-only).
+ */
+export const USDT_GAS_REQUIRED = 'USDT_GAS_REQUIRED'
+
+/** True when a provider error is an out-of-gas-funds failure (not a rejection). */
+function isGasFundsError(e: unknown): boolean {
+  const err = e as { code?: number, message?: string, data?: { message?: string } }
+  if (err?.code === 4001)
+    return false // user rejected the dialog — not a gas problem
+  const msg = (err?.message || err?.data?.message || String(e)).toLowerCase()
+  if (/reject|denied|cancel/.test(msg))
+    return false
+  return /insufficient funds|gas \* price|out of gas|intrinsic gas|exceeds .*balance|insufficient.*(pol|matic)/.test(msg)
+}
+
+/**
  * Pay `usdAmount` USDT (Polygon) to the treasury. Two native approval
  * dialogs: chain switch (if needed) and the transfer itself.
  * Returns the transaction hash and the payer address (the `from` address is
@@ -56,9 +81,17 @@ export async function payUsdt(usdAmount: number): Promise<{ txHash: string, from
     ],
   })
 
-  const txHash = await provider.request({
-    method: 'eth_sendTransaction',
-    params: [{ from, to: USDT_POLYGON.address, data }],
-  }) as string
-  return { txHash, from }
+  try {
+    const txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{ from, to: USDT_POLYGON.address, data }],
+    }) as string
+    return { txHash, from }
+  }
+  catch (e) {
+    // Reclassify "no POL for gas" into a stable code the UI localizes (§gas).
+    if (isGasFundsError(e))
+      throw new Error(USDT_GAS_REQUIRED)
+    throw e
+  }
 }
