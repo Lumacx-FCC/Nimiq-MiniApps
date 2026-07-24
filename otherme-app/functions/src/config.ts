@@ -27,6 +27,16 @@ export const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f16
 /** Public Polygon RPC used when POLYGON_RPC_URL is unset. */
 export const POLYGON_RPC_DEFAULT = "https://polygon-rpc.com";
 
+/**
+ * Public Nimiq Albatross RPC used when NIMIQ_RPC_URL is unset. NimiqWatch runs a
+ * history node (answers getTransactionByHash for older txs) — INTERIM only,
+ * until our own node is up (see docs/server-side-credits.md §A). A third-party
+ * RPC is a trust + availability dependency; override it with the NIMIQ_RPC_URL
+ * secret pointing at our VM once that's live. Set to "" to disable NIM
+ * verification (orders stay skipped).
+ */
+export const NIMIQ_RPC_DEFAULT = "https://rpc.nimiqwatch.com";
+
 /** Confirmation depth before a payment is considered final (reorg safety). */
 export const CONFIRMATIONS_USDT = 5;
 export const CONFIRMATIONS_NIM = 5;

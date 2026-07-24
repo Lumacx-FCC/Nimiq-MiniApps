@@ -11,6 +11,7 @@
  * — no Avast CA shim needed.
  */
 import {
+  NIMIQ_RPC_DEFAULT,
   POLYGON_RPC_DEFAULT,
   RECONCILE_BATCH,
   RECONCILE_GRACE_MS,
@@ -48,10 +49,12 @@ async function verifyOrder(order: OrderWithId): Promise<VerifyResult | { state: 
     const url = process.env.POLYGON_RPC_URL || POLYGON_RPC_DEFAULT;
     return verifyUsdt(order, url);
   }
-  // NIM
-  const url = process.env.NIMIQ_RPC_URL;
+  // NIM — verify against NIMIQ_RPC_URL (our node, once up) or the public
+  // NimiqWatch default. Empty default = disabled → skip (keeps the temporary
+  // client record-purchase grant).
+  const url = process.env.NIMIQ_RPC_URL || NIMIQ_RPC_DEFAULT;
   if (!url)
-    return { state: "skipped" }; // dormant until our node RPC is live
+    return { state: "skipped" };
   return verifyNim(order, url, nimAuth());
 }
 
