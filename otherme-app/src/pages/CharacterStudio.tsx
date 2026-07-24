@@ -11,7 +11,7 @@
  */
 import {
   Clapperboard, Copy, Download, MessageCircle, RefreshCw, RotateCcw, Save,
-  Sparkles, Trash2, Upload, Video, Wand2,
+  Share2, Sparkles, Trash2, Upload, Video, Wand2,
 } from 'lucide-react'
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -25,7 +25,7 @@ import {
   CharacterSheet, DEFAULT_SHEET, PRESETS, RenderStyle, SECTIONS,
   compileSheetPrompt, compileVideoPrompt, styleDirective,
 } from '../character/fields'
-import { SavedSheet, compressImageDataUrl, deleteSheet, downloadDataUrl, listSheets, saveSheet } from '../character/library'
+import { SavedSheet, compressImageDataUrl, deleteSheet, downloadDataUrl, listSheets, saveSheet, shareDataUrl } from '../character/library'
 import Lightbox from '../components/Lightbox'
 
 const FREE_COUNT_KEY = 'otherme:free-generations'
@@ -56,6 +56,7 @@ const COPY = {
     saved: 'Saved to your library',
     saveFailed: 'This device’s app storage is full — delete an old character below, or use Image to save the sheet to your phone (you can re-upload it later as a reference).',
     downloadImg: 'Image',
+    share: 'Share',
     costPerRender: (balance: number) => `${SHEET_RENDER_CREDITS} credit per render · balance: ${balance}`,
     insufficientCredits: 'Not enough credits — top up to keep rendering',
     talk: 'Talk with this character',
@@ -99,6 +100,7 @@ const COPY = {
     saved: 'Guardado en tu biblioteca',
     saveFailed: 'El almacenamiento de la app está lleno — elimina un personaje antiguo abajo, o usa Imagen para guardar la hoja en tu teléfono (puedes resubirla luego como referencia).',
     downloadImg: 'Imagen',
+    share: 'Compartir',
     costPerRender: (balance: number) => `${SHEET_RENDER_CREDITS} crédito por render · saldo: ${balance}`,
     insufficientCredits: 'No tienes créditos suficientes — recarga para seguir renderizando',
     talk: 'Hablar con este personaje',
@@ -473,6 +475,9 @@ export default function CharacterStudio() {
                 </button>
                 <button className="icon-chip" onClick={() => downloadDataUrl(generatedImg, `${formData.name.replace(/\s+/g, '-')}-sheet.webp`)}>
                   <Download size={14} />{t.downloadImg}
+                </button>
+                <button className="icon-chip" onClick={() => void shareDataUrl(generatedImg, `${formData.name.replace(/\s+/g, '-')}-sheet.webp`, { footer: true })}>
+                  <Share2 size={14} />{t.share}
                 </button>
               </div>
               <button className="om-button blue w-full mt-2 !min-h-[42px] !text-sm" onClick={() => talkWith(generatedImg, formData.name)}>

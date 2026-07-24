@@ -3,7 +3,7 @@
  * (character sheet image goes along as identity reference). 5 free scenes,
  * then 5 credits each. Gallery persists in IndexedDB.
  */
-import { Clapperboard, Download, RefreshCw, Save, Trash2, Video, Wand2 } from 'lucide-react'
+import { Clapperboard, Download, RefreshCw, Save, Share2, Trash2, Video, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
@@ -12,7 +12,7 @@ import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { FREE_SCENE_GENERATIONS, SCENE_CREDITS } from '../core/config'
 import { RenderStyle, styleDirective } from '../character/fields'
-import { downloadDataUrl, listSheets } from '../character/library'
+import { downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
 import Lightbox from '../components/Lightbox'
@@ -39,6 +39,7 @@ const COPY = {
     insufficient: `You need ${SCENE_CREDITS} credits to generate a scene`,
     result: 'Your scene',
     save: 'Save',
+    share: 'Share',
     saved: 'Saved to your scene gallery',
     download: 'Download',
     makeVideo: 'Animate as video',
@@ -67,6 +68,7 @@ const COPY = {
     insufficient: `Necesitas ${SCENE_CREDITS} créditos para generar una escena`,
     result: 'Tu escena',
     save: 'Guardar',
+    share: 'Compartir',
     saved: 'Guardada en tu galería de escenas',
     download: 'Descargar',
     makeVideo: 'Animar como video',
@@ -290,6 +292,7 @@ export default function Scenes() {
               <div className="flex gap-2 mt-3 flex-wrap">
                 <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={saveScene}><Save size={15} />{t.save}</button>
                 <button className="icon-chip" onClick={() => downloadDataUrl(result, 'otherme-scene.webp')}><Download size={14} />{t.download}</button>
+                <button className="icon-chip" onClick={() => void shareDataUrl(result, 'otherme-scene.webp', { footer: true })}><Share2 size={14} />{t.share}</button>
                 <button className="icon-chip" onClick={() => toVideo()}><Video size={14} />{t.makeVideo}</button>
               </div>
             </section>
@@ -315,6 +318,7 @@ export default function Scenes() {
                   {scene.characterName && <p className="text-[10px] m-0" style={{ color: 'var(--text-40)' }}>{scene.characterName}</p>}
                   <div className="flex gap-1 mt-1.5">
                     <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" onClick={() => downloadDataUrl(scene.imageDataUrl, `${scene.name.replace(/\s+/g, '-')}.webp`)}><Download size={12} /></button>
+                    <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" onClick={() => void shareDataUrl(scene.imageDataUrl, `${scene.name.replace(/\s+/g, '-')}.webp`, { footer: true })}><Share2 size={12} /></button>
                     <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" onClick={() => toVideo(scene)}><Video size={12} /></button>
                     <button className="icon-chip !min-h-[28px] !min-w-0 !px-2" onClick={() => void removeScene(scene.id)}><Trash2 size={12} style={{ color: 'var(--nimiq-red)' }} /></button>
                   </div>

@@ -69,7 +69,32 @@ body {
   color: var(--text-100);
   -webkit-font-smoothing: antialiased;
   transition: background 0.4s var(--nimiq-ease), color 0.4s var(--nimiq-ease);
+  /* Never let a stray wide child force a horizontal scrollbar on small screens;
+     vertical scroll stays available. */
+  overflow-x: hidden;
 }
+
+/* Media never overflows its container, regardless of intrinsic size. */
+img, video, canvas, svg { max-width: 100%; }
+
+/* Long unbroken strings (wallet/tx addresses, tokens) wrap instead of pushing
+   the layout wider than the viewport. */
+.om-break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Themed scrollbars. Nimiq Pay's WebView exposes no scroll API — scrolling is
+   plain native browser behavior — so we style our own thin, on-brand bars for
+   the scroll containers (galleries, chat, modals) across engines. */
+* {
+  scrollbar-width: thin;                                  /* Firefox */
+  scrollbar-color: var(--om-teal, #2ea3b4) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }          /* Chromium/WebKit */
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--highlight-bg, rgba(255, 255, 255, 0.18));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--om-teal, #2ea3b4); }
 
 .page-shell {
   max-width: 480px;

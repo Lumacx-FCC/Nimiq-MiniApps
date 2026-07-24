@@ -26,12 +26,18 @@ export interface PurchaseRecord {
 }
 
 /**
- * Phase 4 — NIM stays on the temporary client record-purchase grant until our
- * Nimiq node RPC is live and the reconciler's verifyNim is validated against it.
- * Flip to true then, and NIM purchases take the same server-verified confirming
- * path as USDT. USDT is already fully cut over (reconciler is the sole granter).
+ * Phase 4 — NIM server-verified cutover.
+ *
+ * true: session NIM purchases go through the same server-verified confirming
+ * path as USDT (order → pay → claim → onSnapshot → reconciler grants). The
+ * reconciler verifies against NIMIQ_RPC_URL / the public NimiqWatch default.
+ *
+ * Trade-off: NIM (the primary rail) now depends on that RPC being reachable —
+ * an outage makes NIM purchases wait then fail rather than granting. Flip back
+ * to false to restore the instant record-purchase grant if the interim RPC is
+ * unreliable; our own node (docs §A) removes the dependency.
  */
-const NIM_SERVER_VERIFIED = false
+const NIM_SERVER_VERIFIED = true
 
 /**
  * Purchase state machine for the confirming-payment UI (§12). USDT session
