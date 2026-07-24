@@ -126,13 +126,19 @@ function expiryLabel(minutes: number, es: boolean): string {
 function showBrowserLinkOverlay(url: string, filename: string, expiresInMinutes: number): void {
   const es = localStorage.getItem('otherme:lang') === 'es'
   const expiry = expiryLabel(expiresInMinutes, es)
+  // A ready-to-send message (not a bare URL) so a paste into X / WhatsApp /
+  // Telegram reads as a friendly invite and carries the app link too.
+  const message = es
+    ? `Mira mi creación de OtherMe 👉 ${url}\n\nCrea la tuya en ${SHARE_URL}`
+    : `See my OtherMe creation 👉 ${url}\n\nCreate yours at ${SHARE_URL}`
   const copy = {
-    title: es ? 'Descargar en tu navegador' : 'Download in your browser',
+    title: es ? 'Comparte tu creación' : 'Share your creation',
     body: es
-      ? `Nimiq Pay aún no permite guardar archivos directamente. Copia este enlace y ábrelo en el navegador de tu teléfono (Chrome) para descargar «${filename}». El enlace expira en ${expiry}.`
-      : `Nimiq Pay can't save files directly yet. Copy this link and open it in your phone's browser (Chrome) to download “${filename}”. The link expires in ${expiry}.`,
-    copyLabel: es ? 'Copiar enlace' : 'Copy link',
+      ? `Copia este mensaje y envíalo a tus amigos por X, WhatsApp o Telegram — o ábrelo en tu navegador para guardar el archivo. El enlace funciona por ${expiry}.`
+      : `Copy this message and send it to friends on X, WhatsApp or Telegram — or open it in your browser to save the file. The link works for ${expiry}.`,
+    copyLabel: es ? 'Copiar mensaje' : 'Copy message',
     copied: es ? '¡Copiado!' : 'Copied!',
+    open: es ? 'Abrir en el navegador' : 'Open in browser',
     close: es ? 'Cerrar' : 'Close',
   }
 
@@ -143,18 +149,23 @@ function showBrowserLinkOverlay(url: string, filename: string, expiresInMinutes:
   const card = document.createElement('div')
   card.style.cssText = 'max-width:420px;width:100%;border-radius:16px;padding:20px;background:var(--nq-card,#1f2348);color:var(--text-100,#fff);box-shadow:0 24px 70px rgba(0,0,0,.5);font-family:inherit'
   card.innerHTML = `
-    <h3 style="margin:0 0 8px;font-size:16px;font-weight:800">${copy.title}</h3>
+    <h3 style="margin:0 0 8px;font-size:16px;font-weight:800"></h3>
     <p style="margin:0 0 12px;font-size:13px;line-height:1.5;opacity:.85"></p>
-    <input readonly style="width:100%;box-sizing:border-box;border:none;outline:none;border-radius:10px;padding:10px;font-size:12px;background:var(--highlight-bg,rgba(255,255,255,.08));color:inherit" />
+    <textarea readonly rows="4" style="width:100%;box-sizing:border-box;border:none;outline:none;border-radius:10px;padding:10px;font-size:13px;line-height:1.4;resize:none;background:var(--highlight-bg,rgba(255,255,255,.08));color:inherit;font-family:inherit"></textarea>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button data-action="copy" style="flex:1;border:none;border-radius:999px;padding:11px;font-weight:700;font-size:13px;cursor:pointer;background:var(--om-cta-bg,#2ea3b4);color:#fff"></button>
-      <button data-action="close" style="border:none;border-radius:999px;padding:11px 18px;font-weight:700;font-size:13px;cursor:pointer;background:var(--highlight-bg,rgba(255,255,255,.1));color:inherit"></button>
-    </div>`
+      <a data-action="open" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;border-radius:999px;padding:11px 16px;font-weight:700;font-size:13px;cursor:pointer;background:var(--highlight-bg,rgba(255,255,255,.1));color:inherit"></a>
+    </div>
+    <button data-action="close" style="width:100%;margin-top:8px;border:none;border-radius:999px;padding:10px;font-weight:700;font-size:13px;cursor:pointer;background:transparent;color:var(--text-60,rgba(255,255,255,.6))"></button>`
+  card.querySelector('h3')!.textContent = copy.title
   card.querySelector('p')!.textContent = copy.body
-  const input = card.querySelector('input')!
-  input.value = url
+  const textarea = card.querySelector('textarea')!
+  textarea.value = message
   const copyButton = card.querySelector<HTMLButtonElement>('[data-action="copy"]')!
   copyButton.textContent = copy.copyLabel
+  const openLink = card.querySelector<HTMLAnchorElement>('[data-action="open"]')!
+  openLink.textContent = copy.open
+  openLink.href = url
   card.querySelector<HTMLButtonElement>('[data-action="close"]')!.textContent = copy.close
 
   const closeOverlay = () => overlay.remove()
@@ -162,16 +173,16 @@ function showBrowserLinkOverlay(url: string, filename: string, expiresInMinutes:
   card.querySelector('[data-action="close"]')!.addEventListener('click', closeOverlay)
   copyButton.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(message)
     }
     catch {
-      input.select()
+      textarea.select()
       document.execCommand('copy')
     }
     copyButton.textContent = copy.copied
     window.setTimeout(() => { copyButton.textContent = copy.copyLabel }, 2000)
   })
-  input.addEventListener('click', () => input.select())
+  textarea.addEventListener('click', () => textarea.select())
   overlay.appendChild(card)
   document.body.appendChild(overlay)
 }

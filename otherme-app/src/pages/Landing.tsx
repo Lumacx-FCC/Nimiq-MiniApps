@@ -8,7 +8,7 @@
  */
 import {
   ArrowRight, BriefcaseBusiness, ChevronDown, Clapperboard, CloudUpload,
-  MessageCircle, MessagesSquare, MonitorPlay, Share2, Sparkles, UserRound, Video,
+  Images, MessageCircle, MessagesSquare, MonitorPlay, Share2, Sparkles, UserRound, Video,
 } from 'lucide-react'
 import { ChangeEvent, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -25,6 +25,7 @@ const COPY = {
     sampleTag: 'Other Me',
     loginCta: 'Log in to talk and create',
     talkCta: 'Talk and create',
+    galleriesCta: 'Galleries',
     myCharacters: 'My characters',
     noCharacters: 'No saved characters yet — upload an image above to create your first one.',
     scene: 'Scene',
@@ -47,6 +48,7 @@ const COPY = {
     sampleTag: 'Other Me',
     loginCta: 'Inicia sesión para hablar y crear',
     talkCta: 'Hablar y crear',
+    galleriesCta: 'Galerías',
     myCharacters: 'Mis personajes',
     noCharacters: 'Aún no hay personajes guardados — sube una imagen arriba para crear el primero.',
     scene: 'Escena',
@@ -203,10 +205,16 @@ export default function Landing() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-extrabold uppercase tracking-widest m-0" style={{ color: 'var(--text-40)' }}>{t.myCharacters}</h2>
-                  <button className="icon-chip !text-xs" onClick={() => navigate('/talk')}>
-                    <Sparkles size={13} />
-                    {t.talkCta}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button className="icon-chip !text-xs" onClick={() => navigate('/gallery')}>
+                      <Images size={13} />
+                      {t.galleriesCta}
+                    </button>
+                    <button className="icon-chip !text-xs" onClick={() => navigate('/talk')}>
+                      <Sparkles size={13} />
+                      {t.talkCta}
+                    </button>
+                  </div>
                 </div>
                 {!characters.length && <p className="text-sm m-0" style={{ color: 'var(--text-60)' }}>{t.noCharacters}</p>}
                 <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
