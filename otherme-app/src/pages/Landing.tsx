@@ -225,16 +225,18 @@ export default function Landing() {
                         : <span className="w-14 h-14 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--nq-card)' }}><UserRound size={18} style={{ color: 'var(--om-teal)' }} /></span>}
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-sm truncate m-0">{sheet.name}</p>
-                        <p className="text-[11px] m-0" style={{ color: 'var(--text-40)' }}>{sheet.data.alias}</p>
+                        <p className="text-[11px] truncate m-0" style={{ color: 'var(--text-40)' }}>{sheet.data.alias}</p>
                       </div>
-                      <button className="icon-chip !text-[11px] !min-w-0 !px-2.5" onClick={() => navigate('/scenes', { state: { characterId: sheet.id } })}>
-                        <Clapperboard size={13} />{t.scene}
+                      {/* Labels collapse to icons on narrow screens so the action
+                          chips never overlap the character name. */}
+                      <button className="icon-chip !text-[11px] !min-w-0 !px-2.5 shrink-0" title={t.scene} onClick={() => navigate('/scenes', { state: { characterId: sheet.id } })}>
+                        <Clapperboard size={13} /><span className="hidden min-[430px]:inline">{t.scene}</span>
                       </button>
-                      <button className="icon-chip !text-[11px] !min-w-0 !px-2.5" onClick={() => navigate('/videos', { state: { characterId: sheet.id } })}>
-                        <Video size={13} />{t.video}
+                      <button className="icon-chip !text-[11px] !min-w-0 !px-2.5 shrink-0" title={t.video} onClick={() => navigate('/videos', { state: { characterId: sheet.id } })}>
+                        <Video size={13} /><span className="hidden min-[430px]:inline">{t.video}</span>
                       </button>
-                      <button className="icon-chip !text-[11px] !min-w-0 !px-2.5" onClick={() => talkWith(sheet.imageDataUrl, sheet.name)}>
-                        <MessageCircle size={13} />{t.talk}
+                      <button className="icon-chip !text-[11px] !min-w-0 !px-2.5 shrink-0" title={t.talk} onClick={() => talkWith(sheet.imageDataUrl, sheet.name)}>
+                        <MessageCircle size={13} /><span className="hidden min-[430px]:inline">{t.talk}</span>
                       </button>
                     </div>
                   ))}
