@@ -2,7 +2,7 @@
  * Shared header: OM logo (home navigation), credits pill when logged in,
  * theme + language toggles. Present on every page.
  */
-import { Coins, Home, Images, Languages, LogOut, Moon, Sun } from 'lucide-react'
+import { Coins, Home, Images, LogOut, Moon, Sun } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
@@ -19,11 +19,15 @@ export default function AppHeader({ title }: { title?: string }) {
   return (
     <header className="flex items-center justify-between gap-2 mb-4">
       <Link to="/" className="flex items-center gap-2 no-underline min-w-0" style={{ color: 'var(--text-100)' }}>
-        <img
-          src={theme === 'dark' ? '/otherme-icon-dark.png' : '/otherme-icon-light.png'}
-          alt="Other Me"
-          className="w-9 h-9 rounded-full shrink-0"
-        />
+        {/* Fixed-size wrapper guarantees a perfect round box (no flex squish);
+            object-cover keeps the icon's ratio inside it. */}
+        <span className="w-9 h-9 shrink-0 rounded-full overflow-hidden inline-flex">
+          <img
+            src={theme === 'dark' ? '/otherme-icon-dark.png' : '/otherme-icon-light.png'}
+            alt="Other Me"
+            className="w-full h-full object-cover"
+          />
+        </span>
         {/* Wordmark collapses on the narrowest phones so the action chips fit. */}
         <span className="font-extrabold text-lg tracking-tight truncate hidden min-[400px]:inline">{title || 'Other Me'}</span>
         {!isHome && <Home size={16} className="shrink-0 hidden min-[400px]:inline" style={{ color: 'var(--text-40)' }} aria-label={lang === 'es' ? 'Volver al inicio' : 'Back to home'} />}
@@ -54,8 +58,7 @@ export default function AppHeader({ title }: { title?: string }) {
         <button className="icon-chip" onClick={toggleTheme} aria-label={lang === 'es' ? 'Cambiar tema' : 'Toggle theme'}>
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-        <button className="icon-chip" onClick={toggleLang} aria-label="Language">
-          <Languages size={15} />
+        <button className="icon-chip" onClick={toggleLang} aria-label={lang === 'es' ? 'Idioma' : 'Language'} title={lang === 'es' ? 'Idioma' : 'Language'}>
           {lang.toUpperCase()}
         </button>
         {isLoggedIn && (

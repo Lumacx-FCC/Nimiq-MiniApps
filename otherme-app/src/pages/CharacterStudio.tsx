@@ -313,7 +313,7 @@ export default function CharacterStudio() {
         <div className="flex flex-col gap-4">
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.step1}</h2>
-            <div className="flex gap-4 items-stretch">
+            <div className="flex flex-col min-[420px]:flex-row gap-4 min-[420px]:items-stretch">
               <div
                 className="relative w-32 h-32 shrink-0 rounded-2xl overflow-hidden border-2 border-dashed flex items-center justify-center cursor-pointer"
                 style={{ borderColor: 'var(--om-teal)', background: 'var(--highlight-bg)' }}
