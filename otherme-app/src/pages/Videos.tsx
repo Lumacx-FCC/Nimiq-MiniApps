@@ -16,6 +16,7 @@ import { compileVideoPrompt } from '../character/fields'
 import { compressImageDataUrl, downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, SavedVideo, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
+import CollapsibleCard from '../components/CollapsibleCard'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
 
 function splitDataUrl(dataUrl: string): { base64: string, mimeType: string } {
@@ -122,6 +123,7 @@ export default function Videos() {
   const [current, setCurrent] = useState<{ dataUrl: string, interactionId: string | null, editsUsed: number } | null>(null)
   const [editText, setEditText] = useState('')
   const [gallery, setGallery] = useState<SavedVideo[]>([])
+  const [galleryOpen, setGalleryOpen] = useState(false)
   const [savedScenes, setSavedScenes] = useState<SavedScene[]>([])
   const [notice, setNotice] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
   // Which video is being shared (re-encoding the footer runs ~clip length).
@@ -352,10 +354,13 @@ export default function Videos() {
           )}
         </div>
 
-        <section className="om-card h-fit">
-          <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--text-40)' }}>
-            <Video size={14} />{t.gallery}
-          </h2>
+        <CollapsibleCard
+          title={t.gallery}
+          open={galleryOpen}
+          onToggle={() => setGalleryOpen(!galleryOpen)}
+          icon={<Video size={14} className="shrink-0" />}
+          className="h-fit"
+        >
           {!gallery.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[560px] overflow-y-auto pr-1">
             {gallery.map(video => (
@@ -375,7 +380,7 @@ export default function Videos() {
               </div>
             ))}
           </div>
-        </section>
+        </CollapsibleCard>
       </div>
 
       {notice && (

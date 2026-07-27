@@ -15,6 +15,7 @@ import { RenderStyle, styleDirective } from '../character/fields'
 import { downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
 import AppHeader from '../components/AppHeader'
+import CollapsibleCard from '../components/CollapsibleCard'
 import Lightbox from '../components/Lightbox'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
 
@@ -120,6 +121,7 @@ export default function Scenes() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [gallery, setGallery] = useState<SavedScene[]>([])
+  const [galleryOpen, setGalleryOpen] = useState(false)
   const [notice, setNotice] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
   const [lightbox, setLightbox] = useState<{ src: string, alt: string } | null>(null)
   const [freeUsed, setFreeUsed] = useState(() => {
@@ -299,10 +301,13 @@ export default function Scenes() {
           )}
         </div>
 
-        <section className="om-card h-fit">
-          <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--text-40)' }}>
-            <Clapperboard size={14} />{t.gallery}
-          </h2>
+        <CollapsibleCard
+          title={t.gallery}
+          open={galleryOpen}
+          onToggle={() => setGalleryOpen(!galleryOpen)}
+          icon={<Clapperboard size={14} className="shrink-0" />}
+          className="h-fit"
+        >
           {!gallery.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 max-h-[540px] overflow-y-auto pr-1">
             {gallery.map(scene => (
@@ -326,7 +331,7 @@ export default function Scenes() {
               </div>
             ))}
           </div>
-        </section>
+        </CollapsibleCard>
       </div>
 
       {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}

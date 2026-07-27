@@ -8,7 +8,8 @@
  */
 import {
   ArrowRight, BriefcaseBusiness, ChevronDown, Clapperboard, CloudUpload,
-  Images, MessageCircle, MessagesSquare, MonitorPlay, Share2, Sparkles, UserRound, Video,
+  Images, Mail, MessageCircle, MessagesSquare, MonitorPlay, Share2, Sparkles,
+  UserRound, Video, Youtube,
 } from 'lucide-react'
 import { ChangeEvent, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -24,6 +25,7 @@ const COPY = {
     uploadHint: 'PNG · JPG · WEBP — 5 free sheet renders, no account needed',
     sampleTag: 'Other Me',
     loginCta: 'Log in to talk and create',
+    loginToSeeSaved: 'Log in to see your saved images in the gallery.',
     talkCta: 'Talk and create',
     galleriesCta: 'Galleries',
     myCharacters: 'My characters',
@@ -40,6 +42,7 @@ const COPY = {
     social: 'Social interaction',
     talkingWith: 'TALKING WITH',
     loginFirst: 'Log in first to unlock this feature',
+    follow: 'Follow us',
     footer: 'Other Me Labs',
   },
   es: {
@@ -47,6 +50,7 @@ const COPY = {
     uploadHint: 'PNG · JPG · WEBP — 5 renders gratis, sin cuenta',
     sampleTag: 'Other Me',
     loginCta: 'Inicia sesión para hablar y crear',
+    loginToSeeSaved: 'Inicia sesión para ver tus imágenes guardadas en la galería.',
     talkCta: 'Hablar y crear',
     galleriesCta: 'Galerías',
     myCharacters: 'Mis personajes',
@@ -63,9 +67,31 @@ const COPY = {
     social: 'Interacción Social',
     talkingWith: 'HABLANDO CON',
     loginFirst: 'Inicia sesión primero para desbloquear esta función',
+    follow: 'Síguenos',
     footer: 'Other Me Labs',
   },
 } as const
+
+/** Brand marks lucide doesn't ship (simple-icons path data, CC0). */
+const BRAND_PATHS = {
+  x: 'M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z',
+  tiktok: 'M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.6-1.62-.95-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z',
+} as const
+
+function BrandIcon({ path }: { path: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d={path} />
+    </svg>
+  )
+}
+
+const SOCIALS = [
+  { key: 'email', label: 'info@othermeapp.com', href: 'mailto:info@othermeapp.com', icon: <Mail size={14} /> },
+  { key: 'x', label: '@OtherMeAppCR', href: 'https://x.com/OtherMeAppCR', icon: <BrandIcon path={BRAND_PATHS.x} /> },
+  { key: 'youtube', label: '@OtherMeApp', href: 'https://www.youtube.com/@OtherMeApp', icon: <Youtube size={15} /> },
+  { key: 'tiktok', label: '@othermeapp', href: 'https://www.tiktok.com/@othermeapp', icon: <BrandIcon path={BRAND_PATHS.tiktok} /> },
+]
 
 const CAROUSEL = [
   { url: '/avatars/kaelen-male.webp', blur: true },
@@ -183,11 +209,12 @@ export default function Landing() {
                 <ChevronDown size={20} className="mx-auto mb-4 float-slow" style={{ color: 'var(--om-teal)' }} />
                 <button
                   className="om-button w-full text-lg"
-                  onClick={() => navigate('/login', { state: { redirectTo: '/talk' } })}
+                  onClick={() => navigate('/login', { state: { redirectTo: '/gallery' } })}
                 >
                   <Sparkles size={18} />
                   {t.loginCta}
                 </button>
+                <p className="text-xs mt-2 m-0" style={{ color: 'var(--text-60)' }}>{t.loginToSeeSaved}</p>
                 <div className="flex items-center justify-center gap-3 mt-8">
                   {CAROUSEL.map((avatar, index) => (
                     <div
@@ -292,8 +319,23 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="text-center text-sm font-bold pb-2" style={{ color: 'var(--text-60)' }}>
-        {t.footer}
+      <footer className="text-center pb-2">
+        <p className="text-[10px] font-extrabold uppercase tracking-widest mb-2" style={{ color: 'var(--text-40)' }}>{t.follow}</p>
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+          {SOCIALS.map(social => (
+            <a
+              key={social.key}
+              className="icon-chip !text-xs no-underline"
+              href={social.href}
+              target={social.key === 'email' ? undefined : '_blank'}
+              rel="noopener noreferrer"
+            >
+              {social.icon}
+              {social.label}
+            </a>
+          ))}
+        </div>
+        <p className="text-sm font-bold m-0" style={{ color: 'var(--text-60)' }}>{t.footer}</p>
       </footer>
 
       {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}

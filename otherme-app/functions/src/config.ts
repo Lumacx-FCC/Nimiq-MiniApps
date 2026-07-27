@@ -51,11 +51,15 @@ export const RECONCILE_BATCH = 25;
 /** App id used in the NIM transaction data tag (`<appId>:<orderId>`). */
 export const APP_ID = "otherme";
 
-/** Test credit packs (÷5). Keep in sync with the client config. */
+/**
+ * Production credit packs (live since 2026-07-27). `usd` is what we charge: the
+ * early-bird price, 25% off the regular $1 / $5 / $20 until Nov 1st 2026.
+ * Keep in sync with the client config; this copy is the authoritative one.
+ */
 export const PACKS = [
-  { usd: 0.20, credits: 60 },
-  { usd: 1.00, credits: 500 },
-  { usd: 4.00, credits: 3000 },
+  { usd: 0.75, credits: 30 },
+  { usd: 3.75, credits: 200 },
+  { usd: 15.00, credits: 1000 },
 ] as const;
 
 export function findPack(usd: number): { usd: number; credits: number } | null {
