@@ -21,6 +21,7 @@ import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { FREE_SHEET_GENERATIONS, SHEET_RENDER_CREDITS } from '../core/config'
 import AppHeader from '../components/AppHeader'
+import CollapsibleCard from '../components/CollapsibleCard'
 import {
   CharacterSheet, DEFAULT_SHEET, PRESETS, RenderStyle, SECTIONS,
   compileSheetPrompt, compileVideoPrompt, styleDirective,
@@ -145,6 +146,8 @@ export default function CharacterStudio() {
   // Cascade flow: each stage reveals the next section.
   const [sheetReady, setSheetReady] = useState(false)
   const [savedThisSession, setSavedThisSession] = useState(false)
+  // Which cards are expanded — headers stay visible so the flow reads as an outline.
+  const [open, setOpen] = useState({ fields: false, prompt: false, library: true, video: false })
   const [renderStyle, setRenderStyle] = useState<RenderStyle>({ mode: 'animated', customText: '' })
   const [activeSection, setActiveSection] = useState(SECTIONS[0].id)
   const [activePreset, setActivePreset] = useState('')
@@ -169,6 +172,8 @@ export default function CharacterStudio() {
   const videoPrompt = useMemo(() => compileVideoPrompt(formData, videoAction), [formData, videoAction])
   const freeLeft = Math.max(0, FREE_SHEET_GENERATIONS - freeUsed)
   const canGenerate = isLoggedIn || freeLeft > 0
+
+  const toggle = (key: keyof typeof open) => setOpen(previous => ({ ...previous, [key]: !previous[key] }))
 
   const flash = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setNotice({ text, type })
@@ -203,6 +208,8 @@ export default function CharacterStudio() {
         throw new Error(result.error || 'Analysis failed')
       setFormData(result.sheet as CharacterSheet)
       setSheetReady(true)
+      // Analysis done — show what the AI wrote, get the library out of the way.
+      setOpen(previous => ({ ...previous, fields: true, prompt: true, library: false }))
       flash(lang === 'es' ? '¡Análisis completo! Revisa la hoja de diseño.' : 'Analysis complete! Review the design sheet.')
     }
     catch (error) {
@@ -224,6 +231,8 @@ export default function CharacterStudio() {
     }
     setIsGenerating(true)
     setGeneratedImg(null)
+    // Free up the screen for the render: only the prompt stays open.
+    setOpen(previous => ({ ...previous, fields: false, library: false, prompt: true }))
     try {
       const payload: Record<string, string> = { prompt: compiledPrompt }
       if (image && !image.startsWith('http')) {
@@ -285,6 +294,8 @@ export default function CharacterStudio() {
     if (saveSheet(sheet)) {
       setLibrary(listSheets())
       setSavedThisSession(true)
+      // Saved — point them at the next step, close what they're done with.
+      setOpen(previous => ({ ...previous, prompt: false, library: false, video: true }))
       flash(t.saved)
     }
     else {
@@ -361,8 +372,7 @@ export default function CharacterStudio() {
           </section>
 
           {sheetReady && (
-          <section className="om-card">
-            <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.fields}</h2>
+          <CollapsibleCard title={t.fields} open={open.fields} onToggle={() => toggle('fields')}>
             <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
               {SECTIONS.map(s => (
                 <button
@@ -392,21 +402,24 @@ export default function CharacterStudio() {
                 />
               </div>
             ))}
-          </section>
+          </CollapsibleCard>
           )}
         </div>
 
         {/* ---- Right: prompt, generation, result, library, video ---- */}
         <div className="flex flex-col gap-4">
           {sheetReady && (
-          <section className="om-card">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-extrabold uppercase tracking-widest" style={{ color: 'var(--text-40)' }}>{t.prompt}</h2>
+          <CollapsibleCard
+            title={t.prompt}
+            open={open.prompt}
+            onToggle={() => toggle('prompt')}
+            right={(
               <button className="icon-chip !text-xs" onClick={() => copyText(compiledPrompt, 'sheet')}>
                 <Copy size={13} />
                 {copied === 'sheet' ? t.copied : t.copy}
               </button>
-            </div>
+            )}
+          >
             <pre
               className="p-3 rounded-xl text-[11px] leading-relaxed whitespace-pre-wrap max-h-52 overflow-y-auto font-mono"
               style={{ background: 'var(--highlight-bg)', color: 'var(--text-70)' }}
@@ -457,7 +470,7 @@ export default function CharacterStudio() {
                     {t.costPerRender(balance)}
                   </p>
                 )}
-          </section>
+          </CollapsibleCard>
           )}
 
           {generatedImg && (
@@ -487,8 +500,7 @@ export default function CharacterStudio() {
           )}
 
           {(library.length > 0 || savedThisSession) && (
-          <section className="om-card">
-            <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.library}</h2>
+          <CollapsibleCard title={t.library} open={open.library} onToggle={() => toggle('library')}>
             {!library.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
             <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
               {library.map(sheet => (
@@ -512,14 +524,16 @@ export default function CharacterStudio() {
                 </div>
               ))}
             </div>
-          </section>
+          </CollapsibleCard>
           )}
 
           {(savedThisSession || library.length > 0) && (
-          <section className="om-card">
-            <h2 className="text-sm font-extrabold uppercase tracking-widest mb-1 flex items-center gap-2" style={{ color: 'var(--text-40)' }}>
-              <Video size={14} />{t.videoTitle}
-            </h2>
+          <CollapsibleCard
+            title={t.videoTitle}
+            open={open.video}
+            onToggle={() => toggle('video')}
+            icon={<Video size={14} className="shrink-0" />}
+          >
             <p className="text-xs mb-3" style={{ color: 'var(--text-40)' }}>{t.videoHelp}</p>
             <div className="flex gap-2 mb-4">
               <button
@@ -555,7 +569,7 @@ export default function CharacterStudio() {
             >
               {videoPrompt}
             </pre>
-          </section>
+          </CollapsibleCard>
           )}
         </div>
       </div>

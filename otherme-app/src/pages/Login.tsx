@@ -56,7 +56,7 @@ export default function Login() {
 
   const finish = (ok: boolean) => {
     if (ok)
-      navigate(state.redirectTo || '/')
+      navigate(state.redirectTo || '/gallery')
   }
 
   const submitEmail = async (event: FormEvent) => {

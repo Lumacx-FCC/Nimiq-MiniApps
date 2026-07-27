@@ -10,12 +10,15 @@ configure({
   // Team test treasury accounts (same as core-modules demo). Replace for production.
   nimTreasuryAddress: 'NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F',
   evmTreasuryAddress: '0xdA5727CEb6bc093f22F6d56b75F5B3773Fbdf4D1',
-  // TESTING PRICES (÷5). Production: $1/60, $5/500, $20/3000.
-  // ÷5 keeps tester spend low but non-trivial, so purchases cover the AI API cost.
+  // PRODUCTION PRICES (live since 2026-07-27). `usd` is what we actually charge:
+  // the early-bird price, 25% off the regular rate until Nov 1st 2026. Regular
+  // prices live in REGULAR_USD below (shown struck through on the Credits page).
+  // After Nov 1st: set these to the REGULAR_USD values and drop the banner.
+  // KEEP IN SYNC with functions/src/config.ts PACKS — the server is authoritative.
   packs: [
-    { usd: 0.20, credits: 60 },
-    { usd: 1.00, credits: 500 },
-    { usd: 4.00, credits: 3000 },
+    { usd: 0.75, credits: 30 },
+    { usd: 3.75, credits: 200 },
+    { usd: 15.00, credits: 1000 },
   ],
   nimBonusMultiplier: 1.5,
   creditHighlights: [
@@ -26,6 +29,16 @@ configure({
   ],
   paypalEnabled: false,
 })
+
+/**
+ * Regular (pre-discount) price per pack, keyed by the early-bird price we charge.
+ * Display only — struck through next to the live price on the Credits page.
+ */
+export const REGULAR_USD: Record<number, number> = {
+  0.75: 1,
+  3.75: 5,
+  15: 20,
+}
 
 /** One-time starter balance granted the first time an account's ledger is created. */
 export const WELCOME_CREDITS = 5

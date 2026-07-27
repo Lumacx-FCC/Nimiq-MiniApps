@@ -2,7 +2,7 @@
  * Credits — balance, pack purchase with USDT (Polygon) or NIM (+50% bonus),
  * purchase history. Mirrors core-modules CreditsCard on the React bridge.
  */
-import { Coins, History, Loader2, LogOut, Smartphone, Sparkles } from 'lucide-react'
+import { Coins, History, Loader2, LogOut, PartyPopper, Smartphone, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreditPack } from '@core/config'
@@ -10,12 +10,15 @@ import { USDT_GAS_REQUIRED } from '@core/credits/payUsdt'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
 import { useCredits } from '../core/credits'
+import { REGULAR_USD } from '../core/config'
 import AppHeader from '../components/AppHeader'
 
 const COPY = {
   en: {
     balance: 'Your credits',
     packs: 'Top up',
+    earlyBird: '25% off for early birds',
+    earlyBirdUntil: 'until Nov 1st 2026',
     bonus: '+50% with NIM',
     payUsdt: 'Pay with USDT',
     payNim: 'Pay with NIM',
@@ -37,6 +40,8 @@ const COPY = {
   es: {
     balance: 'Tus créditos',
     packs: 'Recargar',
+    earlyBird: '25% de descuento para los primeros',
+    earlyBirdUntil: 'hasta el 1 de noviembre de 2026',
     bonus: '+50% con NIM',
     payUsdt: 'Pagar con USDT',
     payNim: 'Pagar con NIM',
@@ -176,6 +181,17 @@ export default function Credits() {
 
       <div className="om-card mb-4">
         <h2 className="text-lg font-extrabold mb-3">{t.packs}</h2>
+        {/* Early-bird promo: the USD prices below are already discounted. */}
+        <div
+          className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5 mb-3"
+          style={{ background: 'var(--nimiq-gold-bg)', color: '#1f2348', boxShadow: '0 6px 18px rgba(233, 178, 19, 0.3)' }}
+        >
+          <PartyPopper size={18} className="shrink-0" />
+          <p className="m-0 text-sm font-extrabold leading-tight">
+            {t.earlyBird}
+            <span className="block text-xs font-bold opacity-80">{t.earlyBirdUntil}</span>
+          </p>
+        </div>
         <div className="grid grid-cols-3 gap-2 mb-4">
           {allPacks.map(pack => (
             <button
@@ -190,7 +206,14 @@ export default function Credits() {
             >
               <div className="text-xl font-extrabold">{pack.credits}</div>
               <div className="text-[11px]" style={{ color: 'var(--text-40)' }}>credits</div>
-              <div className="text-sm font-bold mt-1" style={{ color: 'var(--nimiq-light-blue)' }}>${pack.usd}</div>
+              <div className="mt-1 leading-tight">
+                {REGULAR_USD[pack.usd] && (
+                  <div className="text-[11px] font-bold line-through" style={{ color: 'var(--text-40)' }}>
+                    ${REGULAR_USD[pack.usd]}
+                  </div>
+                )}
+                <div className="text-sm font-bold" style={{ color: 'var(--nimiq-light-blue)' }}>${pack.usd}</div>
+              </div>
             </button>
           ))}
         </div>
@@ -237,7 +260,7 @@ export default function Credits() {
           </a>
           <a
             className="om-button secondary"
-            href="https://www.nimiq.com/apps?made-by=official"
+            href="https://play.google.com/store/search?q=nimiq%20pay&c=apps&hl=en"
             target="_blank"
             rel="noopener noreferrer"
             style={{ fontSize: 13, padding: '10px 12px' }}
