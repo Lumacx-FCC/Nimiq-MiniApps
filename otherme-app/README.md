@@ -117,22 +117,51 @@ abstraction; confirmed limitation and full design in
 ### 6. Live microphone inside Nimiq Pay
 
 Blocked on the wallet: `getUserMedia` fails there with `NotReadableError`, so we
-ship Web Speech dictation as a turn-based fallback (see the root README). Needs
-Nimiq Pay to grant its WebView a working `RECORD_AUDIO`;
-`public/audio-check.html` produces the exact on-device error report to send them.
+ship Web Speech dictation as a turn-based fallback (see the root README).
+
+**Reproduced twice on-device** (2026-07-28, two separate runs, Samsung Fold 5 /
+Android 16, WebView Chrome 150) via `public/audio-check.html`. Both runs:
+`NotReadableError` with `permissions.query` reporting **`prompt`, not `denied`**,
+one audio input with an empty label — and `SpeechRecognition` succeeding in the
+same session. Since the system speech service can capture while the WebView
+cannot, the gap is Nimiq Pay's own Android mic grant, not the WebView bridge.
+
+**Next action: file this with the Nimiq team** — the two reports, the
+`WebChromeClient.onPermissionRequest` snippet, and the iOS/WKWebView equivalent.
+Not yet sent.
 
 ### 7. Terms & conditions
 
-[`docs/terms-and-conditions.md`](docs/terms-and-conditions.md) is drafted and
-factually accurate but needs legal review of the `[…]` placeholders, a Spanish
-translation, and wiring into the app as a `/terms` route plus footer link.
+[`docs/terms-and-conditions.md`](docs/terms-and-conditions.md) is drafted,
+factually accurate, and linked from the Landing footer. Still needs legal review
+of the `[…]` placeholders, a Spanish translation, and promotion from a repo link
+to an in-app `/terms` route (optionally with a first-purchase acceptance
+checkpoint recorded server-side, if legal advises one).
 
-### 8. Housekeeping
+### 8. Smaller items found along the way
 
+- **Verify `cleanupShares` actually deletes.** It has a silent failure mode: if
+  the runtime service account lacks `storage.objects.delete`, the job logs an
+  error and reports `deleted: 0` while appearing healthy. Force one run from
+  Cloud Scheduler and read `[cleanupShares]` in `run.googleapis.com/stderr`.
+- **Login redirect notices are language-frozen.** The notice is passed to
+  `/login` as an already-resolved string (e.g. `RoleplayStudio.tsx`,
+  `Scenes.tsx`, `Videos.tsx` all inline `lang === 'es' ? … : …`), so switching
+  language after a redirect leaves the previous language on screen — reproduced:
+  a Spanish notice on an English login page. Fix is to pass a copy key and
+  resolve it in `Login.tsx`; six call sites across five files.
+- **Persist the mic error across page loads.** `RoleplayStudio` stashes the
+  `getUserMedia` failure on `window.__omMicError`, but `audio-check.html` is a
+  separate document so it can never read it. Use `sessionStorage` instead.
+- **Don't build "record audio in-app" on the `capture` attribute.** On-device,
+  the Nimiq Pay WebView **ignores** `<input type="file" accept="audio/*" capture>`
+  and opens the ordinary file chooser, so the realistic flow is "pick an existing
+  audio file", not "record now". Dictation is the better path.
 - Pin `@nimiq/mini-app-sdk` — currently `"latest"` against a 0.x package.
 - Real Node host for `server/api.ts` handlers (they only use fetch/env, so
   they're portable).
 
 Done since the last revision of this list: on-chain tx verification before
 granting credits, signed-challenge wallet login, production prices and
-treasuries, and automatic deletion of share-link files.
+treasuries, automatic deletion of share-link files, Web Speech dictation as the
+in-wallet voice fallback, and the credits-per-sign-in-method disclosure.
