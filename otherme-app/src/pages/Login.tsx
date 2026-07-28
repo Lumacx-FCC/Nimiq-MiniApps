@@ -12,7 +12,9 @@ import AppHeader from '../components/AppHeader'
 const COPY = {
   en: {
     title: 'Welcome to Other Me',
-    subtitle: 'One account for characters, avatars and credits.',
+    // Was "One account for characters, avatars and credits" — untrue: credits and
+    // saved work are keyed per sign-in method and are not yet linked.
+    subtitle: 'Sign in to save characters, avatars and credits.',
     nimiq: 'Continue with Nimiq Wallet',
     nimiqHint: 'Opens the native wallet dialog — no password needed.',
     outsidePay: 'Wallet login works inside Nimiq Pay. In the browser, use email below.',
@@ -24,10 +26,11 @@ const COPY = {
     switchToSignUp: 'New here? Create an account',
     switchToLogIn: 'Already have an account? Log in',
     google: 'Continue with Google',
+    accountScope: 'Credits and saved characters stay with the sign-in method you choose — a wallet balance won’t appear under an email login yet. Account linking is coming soon.',
   },
   es: {
     title: 'Bienvenido a Other Me',
-    subtitle: 'Una cuenta para personajes, avatares y créditos.',
+    subtitle: 'Inicia sesión para guardar personajes, avatares y créditos.',
     nimiq: 'Continuar con Nimiq Wallet',
     nimiqHint: 'Abre el diálogo nativo de la wallet — sin contraseña.',
     outsidePay: 'El login con wallet funciona dentro de Nimiq Pay. En navegador usa email.',
@@ -39,6 +42,7 @@ const COPY = {
     switchToSignUp: '¿Nuevo aquí? Crea una cuenta',
     switchToLogIn: '¿Ya tienes cuenta? Inicia sesión',
     google: 'Continuar con Google',
+    accountScope: 'Los créditos y personajes guardados quedan ligados al método que elijas — un saldo de wallet aún no aparece en un inicio de sesión por email. La vinculación de cuentas llegará pronto.',
   },
 } as const
 
@@ -72,7 +76,10 @@ export default function Login() {
 
       <div className="om-card">
         <h1 className="text-2xl font-extrabold text-center mb-1">{t.title}</h1>
-        <p className="text-sm text-center mb-5" style={{ color: 'var(--text-60)' }}>{t.subtitle}</p>
+        <p className="text-sm text-center mb-3" style={{ color: 'var(--text-60)' }}>{t.subtitle}</p>
+        {/* Credits are keyed per sign-in method (wallet address vs email) and are
+            not linked yet — say so before the user picks one. */}
+        <p className="text-xs text-center mb-5" style={{ color: 'var(--text-40)' }}>{t.accountScope}</p>
 
         {state.notice && <div className="nq-notice info mb-4" role="status">{state.notice}</div>}
 

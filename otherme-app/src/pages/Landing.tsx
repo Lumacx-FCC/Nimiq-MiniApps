@@ -36,7 +36,7 @@ const COPY = {
     comingSoon: 'Coming Soon',
     genScenes: 'Generate Scenes',
     genVideo: 'Generate Video',
-    tutorial: 'Tutorial',
+    tutorial: 'App Intro',
     collab: 'Professional Collab',
     roleplay: 'Dynamic Roleplay',
     social: 'Social interaction',
@@ -44,6 +44,7 @@ const COPY = {
     loginFirst: 'Log in first to unlock this feature',
     follow: 'Follow us',
     footer: 'Other Me Labs',
+    terms: 'Terms & Conditions',
   },
   es: {
     uploadCta: 'Sube una imagen y genera tu Character Sheet gratis',
@@ -61,7 +62,7 @@ const COPY = {
     comingSoon: 'Próximamente',
     genScenes: 'Generar Escenas',
     genVideo: 'Generar Video',
-    tutorial: 'Tutorial',
+    tutorial: 'Intro de la app',
     collab: 'Colaboración Profesional',
     roleplay: 'Roleplay Dinámico',
     social: 'Interacción Social',
@@ -69,6 +70,7 @@ const COPY = {
     loginFirst: 'Inicia sesión primero para desbloquear esta función',
     follow: 'Síguenos',
     footer: 'Other Me Labs',
+    terms: 'Términos y Condiciones',
   },
 } as const
 
@@ -85,6 +87,9 @@ function BrandIcon({ path }: { path: string }) {
     </svg>
   )
 }
+
+/** Terms & conditions, hosted in the public repo until the in-app page ships. */
+const TERMS_URL = 'https://github.com/Lumacx-FCC/Nimiq-MiniApps/blob/main/otherme-app/docs/terms-and-conditions.md'
 
 const SOCIALS = [
   { key: 'email', label: 'info@othermeapp.com', href: 'mailto:info@othermeapp.com', icon: <Mail size={14} /> },
@@ -336,6 +341,20 @@ export default function Landing() {
           ))}
         </div>
         <p className="text-sm font-bold m-0" style={{ color: 'var(--text-60)' }}>{t.footer}</p>
+        {/* Interim: the terms live in the repo until the `[…]` placeholders clear
+            legal review and a Spanish version exists, at which point this becomes
+            an in-app /terms route (see docs/terms-and-conditions.md). */}
+        <p className="text-xs mt-1 m-0">
+          <a
+            className="no-underline hover:underline"
+            style={{ color: 'var(--text-40)' }}
+            href={TERMS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t.terms}
+          </a>
+        </p>
       </footer>
 
       {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
@@ -356,7 +375,7 @@ export default function Landing() {
               <iframe
                 width="100%"
                 height="100%"
-                src="https://www.youtube-nocookie.com/embed/__MXZPHh1cc?autoplay=1"
+                src="https://www.youtube-nocookie.com/embed/whnIsff4K80?autoplay=1"
                 title={t.tutorial}
                 style={{ border: 0 }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

@@ -30,13 +30,22 @@ function getEthereum() {
  * Stable error code thrown when a USDT transfer fails because the wallet has no
  * native gas token (POL, formerly MATIC) on Polygon.
  *
- * NOTE (2026-07-23): Nimiq Pay mini apps get NO gas abstraction — the gasless
- * USDT experience is native-wallet-only, and `eth_sendTransaction` follows
- * standard EVM gas rules, so the user must hold POL. There is no in-app fix
- * (Polygon USDT has no permit/EIP-3009 for a relayer). We surface a clear
- * message and steer users to NIM (gasless + bonus). TODO: revisit — either
- * validate this UX on-device or drop the USDT rail entirely (as NimBomber and
- * other Nimiq mini apps do, going NIM-only).
+ * NOTE (2026-07-27): Nimiq Pay mini apps get NO gas abstraction. The gasless
+ * USDT experience is wallet-internal (OpenGSN v2 relay + a transfer contract
+ * that swaps stablecoin → POL via Uniswap) and is not exposed to mini apps —
+ * Nimiq's own docs say so (`mini-apps/features/evm-tokens.md`: "In a mini app,
+ * standard EVM gas rules apply… The user must hold the native token"). There is
+ * no native rail to switch to either: `@nimiq/mini-app-sdk@0.1.0` whitelists 10
+ * NIM/Luna-only wallet methods, so `window.ethereum` is the only stablecoin
+ * path. The user must hold POL; we surface a clear message and steer to NIM
+ * (gasless + bonus).
+ *
+ * A fix IS possible, contrary to an earlier note here: Polygon USDT has no
+ * EIP-2612 `permit`, but it is a `UChildERC20` and implements
+ * `executeMetaTransaction` (Polygon's EIP-712 meta-transactions), and Nimiq Pay
+ * exposes `eth_signTypedData_v4` — so the user can sign gaslessly and a relayer
+ * we run can pay the POL. Deferred past Cycle I (needs a hot wallet, nonce-safe
+ * sends, spend quotas, paid RPC). Design: `otherme-app/docs/usdt-gas-abstraction.md`.
  */
 export const USDT_GAS_REQUIRED = 'USDT_GAS_REQUIRED'
 
