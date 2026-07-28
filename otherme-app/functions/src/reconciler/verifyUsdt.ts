@@ -50,6 +50,19 @@ export async function verifyUsdt(order: OrderWithId, rpcUrl: string): Promise<Ve
   const payer = order.payerAddress.toLowerCase();
   const expected = BigInt(order.expectedBaseUnits);
 
+  // Verification is deliberately LOG-BASED, not transaction-based — keep it that
+  // way. We never fetch the tx, so `tx.from` is never asserted, which is what
+  // lets a future gasless relayer work: with `executeMetaTransaction`, `tx.from`
+  // is our relayer while the Transfer log's `from` is still the user (see
+  // `docs/usdt-gas-abstraction.md`). Do NOT add a `tx.from == payerAddress`
+  // check — §8 of `docs/server-side-credits.md` specifies a stricter shape than
+  // what shipped, and tightening it here would silently break that path. A
+  // `tx.to == USDT contract` check would be safe (a meta-tx still targets the
+  // token), but mind the casing: config.ts is lowercase, payUsdt.ts checksummed.
+  //
+  // One tx hash per order is a hard constraint: `find` takes the FIRST matching
+  // Transfer, so batching several users into one relayed tx would fail every
+  // order but the first with "payer mismatch".
   const transfer = receipt.logs.find(
     log => log.address.toLowerCase() === USDT_POLYGON_CONTRACT
       && log.topics[0]?.toLowerCase() === ERC20_TRANSFER_TOPIC,

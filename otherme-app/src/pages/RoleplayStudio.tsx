@@ -169,7 +169,13 @@ const COPY = {
     demoHelp: 'Voice runs on Gemini Live once the server key is configured.',
     changeAvatar: 'Change Avatar',
     voicesComingSoon: 'More voices and backgrounds coming soon!',
-    micUnavailable: 'Microphone unavailable — allow mic access for Nimiq Pay in your phone settings, or type below to talk.',
+    micUnavailable: 'Live microphone unavailable here — type below to talk. Your character still answers out loud.',
+    dictationOn: 'Voice mode on — speak one turn at a time.',
+    dictationNote: 'Voice mode (dictation): Nimiq Pay can’t stream the mic live, so this takes turns — speak, then wait for the reply. The mic pauses while your character is talking, and it needs an internet connection. You can type below at any time instead.',
+    dictationListening: 'Listening — speak now',
+    dictationPaused: 'Paused while your character speaks…',
+    dictationBlocked: 'Voice input was blocked — type below to keep talking.',
+    dictationOffline: 'Voice input needs internet — type below, or try again when you’re back online.',
     storeFailed: 'Avatar created, but device storage is full — it will be lost when you leave. Delete an old avatar or character to keep it.',
   },
   es: {
@@ -223,7 +229,13 @@ const COPY = {
     demoHelp: 'La voz usa Gemini Live cuando la clave del servidor está configurada.',
     changeAvatar: 'Cambiar Avatar',
     voicesComingSoon: '¡Más voces y fondos muy pronto!',
-    micUnavailable: 'Micrófono no disponible — permite el acceso al micrófono para Nimiq Pay en los ajustes del teléfono, o escribe abajo para hablar.',
+    micUnavailable: 'Micrófono en vivo no disponible aquí — escribe abajo para hablar. Tu personaje sigue respondiendo en voz alta.',
+    dictationOn: 'Modo voz activado — habla de a un turno.',
+    dictationNote: 'Modo voz (dictado): Nimiq Pay no puede transmitir el micrófono en vivo, así que es por turnos — habla y espera la respuesta. El micrófono se pausa mientras tu personaje habla, y necesita conexión a internet. También puedes escribir abajo cuando quieras.',
+    dictationListening: 'Escuchando — habla ahora',
+    dictationPaused: 'En pausa mientras tu personaje habla…',
+    dictationBlocked: 'La entrada de voz fue bloqueada — escribe abajo para seguir hablando.',
+    dictationOffline: 'La entrada de voz necesita internet — escribe abajo, o inténtalo cuando vuelvas a estar en línea.',
     storeFailed: 'Avatar creado, pero el almacenamiento está lleno — se perderá al salir. Elimina un avatar o personaje antiguo para conservarlo.',
   },
 } as const
@@ -389,6 +401,45 @@ async function removeChromaGreen(dataUrl: string) {
   return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png')
 }
 
+/**
+ * Web Speech dictation — the voice-input fallback for the Nimiq Pay WebView.
+ *
+ * Confirmed on-device 2026-07-28 (Samsung Fold 5 / Android 16, WebView Chrome
+ * 150) via `public/audio-check.html`: `getUserMedia` fails there with
+ * `NotReadableError` ("could not start audio source") — NOT a denied
+ * permission — so live PCM streaming to Gemini is impossible. But
+ * `SpeechRecognition` DOES work, because Android's system speech service
+ * captures audio in its own process rather than through the WebView. That
+ * gives us hands-free voice in / voice out, at the cost of being turn-based.
+ *
+ * Typed only as far as we use it; the DOM lib ships no stable definitions.
+ */
+interface SpeechAlternative { transcript: string }
+interface SpeechResult { readonly length: number, [index: number]: SpeechAlternative }
+interface SpeechResultList { readonly length: number, [index: number]: SpeechResult }
+interface SpeechResultEvent { resultIndex: number, results: SpeechResultList }
+interface SpeechErrorEvent { error: string }
+interface SpeechRecognizer {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  onresult: ((event: SpeechResultEvent) => void) | null
+  onerror: ((event: SpeechErrorEvent) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+  abort: () => void
+}
+
+function getSpeechRecognizer(): (new () => SpeechRecognizer) | null {
+  const scope = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognizer
+    webkitSpeechRecognition?: new () => SpeechRecognizer
+  }
+  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null
+}
+
 function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
@@ -443,8 +494,14 @@ export default function RoleplayStudio() {
   const [uploadSubject, setUploadSubject] = useState<SpriteSubject>('human')
   const [generating, setGenerating] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // Voice mode is running on Web Speech dictation instead of a live mic stream.
+  const [dictation, setDictation] = useState(false)
 
   const sessionRef = useRef<Session | null>(null)
+  const recognitionRef = useRef<SpeechRecognizer | null>(null)
+  const dictationOnRef = useRef(false)
+  const dictationPauseRef = useRef<() => void>(() => {})
+  const dictationResumeRef = useRef<() => void>(() => {})
   const previewOnlyRef = useRef(false)
   const inputContextRef = useRef<AudioContext | null>(null)
   const inputStreamRef = useRef<MediaStream | null>(null)
@@ -638,6 +695,9 @@ export default function RoleplayStudio() {
     const startAt = Math.max(context.currentTime + 0.02, outputCursorRef.current)
     source.start(startAt)
     setLiveState('speaking')
+    // Deafen dictation for the duration of playback, else the recognizer picks
+    // the character's own voice up off the speaker.
+    dictationPauseRef.current()
     outputCursorRef.current = startAt + audioBuffer.duration
     modelSpeechUntilRef.current = performance.now() + Math.max(0, (outputCursorRef.current - context.currentTime) * 1000)
     outputSourcesRef.current.add(source)
@@ -646,6 +706,7 @@ export default function RoleplayStudio() {
       if (!outputSourcesRef.current.size) {
         setLiveState(state => state === 'idle' ? state : 'listening')
         setMouthFrame(0)
+        dictationResumeRef.current()
       }
     }
   }, [startMouthAnimation])
@@ -661,7 +722,99 @@ export default function RoleplayStudio() {
     inputContextRef.current = null
   }, [])
 
+  /**
+   * Dictation fallback. `dictationOnRef` is the intent ("the user is in voice
+   * mode"); the recognizer itself is started and aborted repeatedly underneath
+   * it, because Android ends a recognition session after each utterance and we
+   * must not listen while the avatar is speaking (the recognizer hears the
+   * phone's own speaker and transcribes the character back to itself).
+   */
+  const stopDictation = useCallback(() => {
+    dictationOnRef.current = false
+    const recognition = recognitionRef.current
+    recognitionRef.current = null
+    try { recognition?.abort() }
+    catch { /* already torn down */ }
+    setDictation(false)
+  }, [])
+
+  const startDictation = useCallback((session: Session): boolean => {
+    const Recognizer = getSpeechRecognizer()
+    if (!Recognizer)
+      return false
+
+    let recognition: SpeechRecognizer
+    try { recognition = new Recognizer() }
+    catch { return false }
+
+    recognition.lang = lang === 'es' ? 'es-ES' : 'en-US'
+    recognition.continuous = true
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+
+    recognition.onresult = (event) => {
+      let transcript = ''
+      for (let i = event.resultIndex; i < event.results.length; i++)
+        transcript += `${event.results[i][0].transcript} `
+      transcript = transcript.trim()
+      if (!transcript || !sessionRef.current)
+        return
+      setMessages(current => [...current, { id: makeId(), role: 'user', text: transcript }])
+      try { sessionRef.current.sendRealtimeInput({ text: transcript }) }
+      catch { /* session closed mid-utterance */ }
+    }
+
+    recognition.onerror = (event) => {
+      // no-speech/aborted are routine: onend restarts us.
+      if (event.error === 'no-speech' || event.error === 'aborted')
+        return
+      if (event.error === 'network')
+        return flash(t.dictationOffline)
+      stopDictation()
+      flash(t.dictationBlocked)
+    }
+
+    recognition.onend = () => {
+      // Android hands back one utterance at a time — resume unless the avatar
+      // is mid-sentence, in which case the output drain handler resumes us.
+      if (!dictationOnRef.current || !sessionRef.current || outputSourcesRef.current.size)
+        return
+      try { recognitionRef.current?.start() }
+      catch { /* already running */ }
+    }
+
+    recognitionRef.current = recognition
+    dictationOnRef.current = true
+    try {
+      recognition.start()
+    }
+    catch {
+      stopDictation()
+      return false
+    }
+    setDictation(true)
+    void session
+    return true
+  }, [flash, lang, stopDictation, t.dictationBlocked, t.dictationOffline])
+
+  // Echo guard, driven by the audio-output lifecycle in `playPcm`.
+  useEffect(() => {
+    dictationPauseRef.current = () => {
+      if (dictationOnRef.current) {
+        try { recognitionRef.current?.abort() }
+        catch { /* not running */ }
+      }
+    }
+    dictationResumeRef.current = () => {
+      if (!dictationOnRef.current || !sessionRef.current)
+        return
+      try { recognitionRef.current?.start() }
+      catch { /* already running */ }
+    }
+  }, [])
+
   const stopSession = useCallback(async () => {
+    stopDictation()
     await stopInput()
     clearOutput()
     try { sessionRef.current?.close() }
@@ -669,10 +822,13 @@ export default function RoleplayStudio() {
     sessionRef.current = null
     previewOnlyRef.current = false
     setLiveState('idle')
-  }, [clearOutput, stopInput])
+  }, [clearOutput, stopDictation, stopInput])
 
   useEffect(() => () => {
     inputStreamRef.current?.getTracks().forEach(track => track.stop())
+    dictationOnRef.current = false
+    try { recognitionRef.current?.abort() }
+    catch { /* no-op */ }
     try { sessionRef.current?.close() }
     catch { /* no-op */ }
     if (mouthAnimationRef.current)
@@ -802,11 +958,22 @@ export default function RoleplayStudio() {
       if (withMic) {
         // Mic failure (WebView permission, busy device) must not kill the
         // session — voice output + typed input still work without it.
+        // The error NAME is the whole diagnosis and there are no devtools in
+        // the wallet WebView, so stash it where `/audio-check.html` can read it:
+        // NotAllowedError = host app never granted the WebView audio capture,
+        // NotFoundError = no input device, SecurityError = insecure origin.
         try {
           await startMicrophone(session)
         }
-        catch {
-          flash(t.micUnavailable)
+        catch (error) {
+          const name = error instanceof Error ? error.name : 'UnknownError'
+          const detail = error instanceof Error ? error.message : String(error)
+          console.warn('[mic] getUserMedia failed:', name, detail)
+          ;(window as unknown as { __omMicError?: string }).__omMicError = `${name}: ${detail}`
+          // Inside Nimiq Pay this is where we land (NotReadableError). Web Speech
+          // dictation still reaches the OS mic, so try it before falling back to
+          // typing-only.
+          flash(startDictation(session) ? t.dictationOn : t.micUnavailable)
           setLiveState('listening')
         }
       }
@@ -818,7 +985,7 @@ export default function RoleplayStudio() {
       flash(`${t.demo}: ${message}`)
       return null
     }
-  }, [activeAvatar.systemPrompt, clearOutput, flash, lang, playPcm, startMicrophone, stopSession, t.demo, t.micUnavailable, voice])
+  }, [activeAvatar.systemPrompt, clearOutput, flash, lang, playPcm, startDictation, startMicrophone, stopSession, t.demo, t.dictationOn, t.micUnavailable, voice])
 
   const previewVoice = async () => {
     if (liveState !== 'idle')
@@ -1129,6 +1296,15 @@ export default function RoleplayStudio() {
               )}
               {messages.map(message => <div key={message.id} className={`message ${message.role}`}><span>{message.role === 'user' ? (lang === 'es' ? 'Tú' : 'You') : activeAvatar.alias}</span><p>{message.text}</p></div>)}
             </div>
+            {dictation && (
+              <div className="dictation-note" role="status">
+                <p className="dictation-state">
+                  <Mic size={13} />
+                  {liveState === 'speaking' ? t.dictationPaused : t.dictationListening}
+                </p>
+                <p>{t.dictationNote}</p>
+              </div>
+            )}
             <form className="chat-input" onSubmit={sendText}>
               <input value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.placeholder} aria-label={t.placeholder} />
               <button type="submit" aria-label={t.send}><Send size={17} /></button>

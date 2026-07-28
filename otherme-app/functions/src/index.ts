@@ -536,3 +536,49 @@ export const reconcile = onSchedule(
     console.log("[reconcile]", JSON.stringify(summary));
   },
 );
+
+/**
+ * Enforce the share-link TTL.
+ *
+ * `createShare` promises the client the link lasts SHARE_TTL_HOURS, but nothing
+ * deleted the object — shared images and clips sat at a public URL forever while
+ * the UI called them temporary. That is a disclosure problem as much as a
+ * storage one (see `docs/terms-and-conditions.md` §8), so the promise is now
+ * actually kept. Deliberately a separate daily job rather than work bolted onto
+ * the 1-minute reconciler.
+ */
+export const cleanupShares = onSchedule(
+  {
+    schedule: "every 24 hours",
+    region: "us-central1",
+    timeoutSeconds: 300,
+    memory: "256MiB",
+  },
+  async () => {
+    const cutoff = Date.now() - SHARE_TTL_HOURS * 60 * 60 * 1000;
+    const [files] = await getStorage().bucket().getFiles({ prefix: "shares/" });
+    let deleted = 0;
+    let kept = 0;
+    let undated = 0;
+    for (const file of files) {
+      const created = Date.parse(String(file.metadata?.timeCreated ?? ""));
+      if (!Number.isFinite(created)) {
+        // No timeCreated: leave it rather than risk deleting something new.
+        undated++;
+        continue;
+      }
+      if (created >= cutoff) {
+        kept++;
+        continue;
+      }
+      try {
+        await file.delete();
+        deleted++;
+      }
+      catch (error) {
+        console.error("[cleanupShares] delete failed:", file.name, error);
+      }
+    }
+    console.log("[cleanupShares]", JSON.stringify({ scanned: files.length, deleted, kept, undated }));
+  },
+);

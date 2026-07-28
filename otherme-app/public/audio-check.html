@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Other Me — audio capability check</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #0d1020; color: #dce6f2; padding: 16px 14px 48px;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  h1 { font-size: 17px; letter-spacing: .01em; margin-bottom: 2px; }
+  .sub { color: #7f93ab; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #3fc9d8;
+       margin: 20px 0 8px; font-weight: 600; }
+  .row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid #1b2136; align-items: baseline; }
+  .row .k { flex: 0 0 44%; color: #8fa3ba; font-size: 12.5px; }
+  .row .v { flex: 1; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12.5px;
+            word-break: break-word; }
+  .ok   { color: #4ade80; } .bad { color: #f87171; } .warn { color: #e9b213; } .dim { color: #64748b; }
+  button {
+    display: block; width: 100%; margin: 8px 0; padding: 13px 14px;
+    background: #17203a; color: #eaf2fb; border: 1px solid #2c3550; border-radius: 11px;
+    font: 600 14px inherit; cursor: pointer;
+  }
+  button:active { background: #1f2b4c; }
+  button.primary { background: linear-gradient(135deg, #6fc7d6, #2ea3b4); color: #06121a; border: 0; }
+  button.gold { background: linear-gradient(135deg, #ec991c, #e9b213); color: #241a02; border: 0; }
+  #out { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px;
+         background: #080b16; border: 1px solid #1b2136; border-radius: 10px; padding: 11px;
+         margin-top: 10px; color: #9fb4cb; max-height: 220px; overflow: auto; }
+  .note { font-size: 12px; color: #7f93ab; margin-top: 6px; }
+  audio { width: 100%; margin-top: 10px; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Audio capability check</h1>
+<div class="sub">Open this page <strong>inside Nimiq Pay</strong> (Mini Apps), run all four tests, then copy the results.</div>
+
+<h2>Environment</h2>
+<div id="env"></div>
+
+<h2>1 · Microphone capture</h2>
+<button class="primary" id="btnMic">Request microphone</button>
+<div class="note">This is the path <em>Talk</em> uses. <code>NotAllowedError</code> means the wallet never granted the WebView audio capture — not a bug we can fix in the app.</div>
+<div id="micOut"></div>
+
+<h2>2 · Audio output</h2>
+<button id="btnTone">Play test tone</button>
+<div class="note">Proves the avatar's voice can be heard, independent of the mic.</div>
+<div id="toneOut"></div>
+
+<h2>3 · Native recorder fallback</h2>
+<button class="gold" id="btnCapture">A · Record now (capture hint)</button>
+<input type="file" id="fileCapture" accept="audio/*" capture>
+<button class="gold" id="btnPick">B · Pick an existing audio file</button>
+<input type="file" id="filePick" accept="audio/*">
+<div class="note">Uses the OS recorder / file chooser instead of <code>getUserMedia</code>. Try <strong>both</strong> — some WebViews mishandle the <code>capture</code> hint but still allow a plain pick. Image upload already works in Nimiq Pay, so the file chooser itself is implemented; the question is only whether it accepts audio. If either works while test 1 fails, voice input is still achievable — just not live.</div>
+<div id="fileOut"></div>
+
+<h2>4 · Speech recognition</h2>
+<button id="btnSpeech">Test SpeechRecognition</button>
+<div class="note">On-device dictation, if the WebView exposes it.</div>
+<div id="speechOut"></div>
+
+<h2>Results</h2>
+<button id="btnCopy">Copy all results</button>
+<div id="out">Running environment checks…</div>
+
+<script>
+var log = [];
+function esc(s) { return String(s).replace(/[<>&]/g, function (c) { return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]; }); }
+function cls(v) { return v === true ? 'ok' : v === false ? 'bad' : 'dim'; }
+function row(target, k, v, klass) {
+  var d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<div class="k">' + esc(k) + '</div><div class="v ' + (klass || cls(v)) + '">' + esc(v) + '</div>';
+  document.getElementById(target).appendChild(d);
+  log.push(k + ': ' + v);
+  dump();
+}
+function dump() { document.getElementById('out').textContent = log.join('\n'); }
+
+/* ---------- passive environment checks ---------- */
+(function () {
+  var ua = navigator.userAgent;
+  var isWv = /\bwv\b/.test(ua);
+  row('env', 'User agent', ua, 'dim');
+  row('env', 'Android WebView (wv)', isWv ? 'YES — in-app WebView' : 'no — real browser', isWv ? 'warn' : 'ok');
+  row('env', 'Origin', location.origin, 'dim');
+  row('env', 'Secure context', window.isSecureContext === true, cls(window.isSecureContext === true));
+  row('env', 'navigator.mediaDevices', !!navigator.mediaDevices);
+  row('env', 'getUserMedia', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+  row('env', 'MediaRecorder', typeof MediaRecorder !== 'undefined');
+  row('env', 'AudioContext', !!(window.AudioContext || window.webkitAudioContext));
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  row('env', 'SpeechRecognition', !!SR);
+  row('env', 'Web Share', !!navigator.share);
+  var prior = window.__omMicError;
+  if (prior) row('env', 'Last mic error in app', prior, 'bad');
+
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+    var mimes = ['audio/webm', 'audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg'].filter(function (m) {
+      try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; }
+    });
+    row('env', 'Recordable formats', mimes.length ? mimes.join(', ') : 'none', mimes.length ? 'ok' : 'bad');
+  }
+
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'microphone' }).then(function (s) {
+      row('env', 'Permission state', s.state, s.state === 'granted' ? 'ok' : s.state === 'denied' ? 'bad' : 'warn');
+    }).catch(function (e) { row('env', 'Permission state', 'unavailable (' + e.name + ')', 'dim'); });
+  } else {
+    row('env', 'Permissions API', 'absent', 'dim');
+  }
+
+  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+    navigator.mediaDevices.enumerateDevices().then(function (list) {
+      var ins = list.filter(function (d) { return d.kind === 'audioinput'; });
+      row('env', 'Audio inputs seen', ins.length, ins.length ? 'ok' : 'bad');
+      // empty labels = devices exist but permission was never granted
+      var named = ins.filter(function (d) { return d.label; }).length;
+      row('env', 'Inputs with labels', named + ' / ' + ins.length, named ? 'ok' : 'warn');
+    }).catch(function (e) { row('env', 'enumerateDevices', 'failed (' + e.name + ')', 'bad'); });
+  }
+})();
+
+/* ---------- 1. microphone ---------- */
+document.getElementById('btnMic').onclick = function () {
+  document.getElementById('micOut').innerHTML = '';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    row('micOut', 'getUserMedia', 'API not present at all', 'bad');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function (stream) {
+      var t = stream.getAudioTracks()[0];
+      row('micOut', 'Result', 'GRANTED — capture works', 'ok');
+      row('micOut', 'Track label', (t && t.label) || '(unnamed)', 'dim');
+      try {
+        var st = t.getSettings ? t.getSettings() : {};
+        row('micOut', 'Sample rate', st.sampleRate || 'n/a', 'dim');
+        row('micOut', 'Channels', st.channelCount || 'n/a', 'dim');
+      } catch (e) { /* getSettings unsupported */ }
+      // confirm real signal, not a silent/dummy device
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        var ctx = new AC();
+        var an = ctx.createAnalyser();
+        ctx.createMediaStreamSource(stream).connect(an);
+        var buf = new Uint8Array(an.frequencyBinCount);
+        var peak = 0, n = 0;
+        var iv = setInterval(function () {
+          an.getByteTimeDomainData(buf);
+          for (var i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128));
+          if (++n > 20) {
+            clearInterval(iv);
+            row('micOut', 'Signal detected', peak > 2 ? 'yes (peak ' + peak + ') — speak to raise it' : 'silent (peak ' + peak + ')', peak > 2 ? 'ok' : 'warn');
+            stream.getTracks().forEach(function (x) { x.stop(); });
+            ctx.close();
+          }
+        }, 100);
+      } catch (e) {
+        stream.getTracks().forEach(function (x) { x.stop(); });
+      }
+    })
+    .catch(function (e) {
+      row('micOut', 'Result', 'BLOCKED', 'bad');
+      row('micOut', 'Error name', e.name, 'bad');
+      row('micOut', 'Message', e.message || '(none)', 'dim');
+      var hint = e.name === 'NotAllowedError'
+        ? 'Host app did not grant the WebView audio capture (or user denied). Nimiq Pay must implement WebChromeClient.onPermissionRequest.'
+        : e.name === 'NotFoundError' ? 'No microphone device visible to the WebView.'
+        : e.name === 'SecurityError' ? 'Insecure origin — must be HTTPS.'
+        : e.name === 'NotReadableError' || e.name === 'TrackStartError'
+          ? 'Permission was NOT refused — the audio device itself failed to open. Either the host app lacks a usable Android RECORD_AUDIO grant (AudioRecord cannot start), or the mic is genuinely held by another app. Reboot, close everything, and retry to tell these apart.'
+        : 'Unrecognised failure.';
+      row('micOut', 'Diagnosis', hint, 'warn');
+    });
+};
+
+/* ---------- 2. output ---------- */
+document.getElementById('btnTone').onclick = function () {
+  document.getElementById('toneOut').innerHTML = '';
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC();
+    row('toneOut', 'Context state', ctx.state, ctx.state === 'running' ? 'ok' : 'warn');
+    row('toneOut', 'Output sample rate', ctx.sampleRate, 'dim');
+    var go = function () {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 440; g.gain.value = 0.15;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.5);
+      row('toneOut', 'Tone', 'played 440Hz for 0.5s — did you hear it?', 'ok');
+    };
+    ctx.state === 'suspended' ? ctx.resume().then(go).catch(function (e) {
+      row('toneOut', 'Resume failed', e.name, 'bad');
+    }) : go();
+  } catch (e) {
+    row('toneOut', 'AudioContext failed', e.name + ': ' + e.message, 'bad');
+  }
+};
+
+/* ---------- 3. native recorder via file input ---------- */
+function wireFile(btnId, inputId, label) {
+  document.getElementById(btnId).onclick = function () {
+    row('fileOut', label + ' — opening', 'if nothing appears, the chooser refused this accept type', 'warn');
+    document.getElementById(inputId).click();
+  };
+  document.getElementById(inputId).onchange = function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) { row('fileOut', label + ' result', 'cancelled or no file returned', 'bad'); return; }
+    row('fileOut', label + ' result', 'FILE RECEIVED — fallback viable', 'ok');
+    row('fileOut', label + ' name', f.name, 'dim');
+    row('fileOut', label + ' type', f.type || '(unknown)', 'dim');
+    row('fileOut', label + ' size', (f.size / 1024).toFixed(1) + ' KB', 'dim');
+    var a = document.createElement('audio');
+    a.controls = true; a.src = URL.createObjectURL(f);
+    document.getElementById('fileOut').appendChild(a);
+  };
+}
+wireFile('btnCapture', 'fileCapture', 'A capture');
+wireFile('btnPick', 'filePick', 'B pick');
+
+/* ---------- 4. speech recognition ---------- */
+document.getElementById('btnSpeech').onclick = function () {
+  document.getElementById('speechOut').innerHTML = '';
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { row('speechOut', 'Result', 'API absent in this WebView', 'bad'); return; }
+  try {
+    var r = new SR();
+    r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 1;
+    r.onresult = function (e) { row('speechOut', 'Transcript', e.results[0][0].transcript, 'ok'); };
+    r.onerror = function (e) { row('speechOut', 'Error', e.error, 'bad'); };
+    r.onend = function () { row('speechOut', 'Session', 'ended', 'dim'); };
+    r.start();
+    row('speechOut', 'Started', 'listening — say something', 'warn');
+  } catch (e) {
+    row('speechOut', 'Failed to start', e.name + ': ' + e.message, 'bad');
+  }
+};
+
+/* ---------- copy ---------- */
+document.getElementById('btnCopy').onclick = function () {
+  var text = 'Other Me audio check — ' + new Date().toISOString() + '\n\n' + log.join('\n');
+  var done = function (ok) {
+    var b = document.getElementById('btnCopy');
+    b.textContent = ok ? 'Copied ✓' : 'Copy failed — select the text below';
+    setTimeout(function () { b.textContent = 'Copy all results'; }, 2200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { done(true); }).catch(function () { done(false); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) { /* no-op */ }
+    document.body.removeChild(ta); done(ok);
+  }
+};
+</script>
+</body>
+</html>

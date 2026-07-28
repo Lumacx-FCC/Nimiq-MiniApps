@@ -36,6 +36,7 @@ const COPY = {
     empty: 'No purchases yet.',
     logout: 'Log out',
     loginNeeded: 'Log in to buy and use credits.',
+    accountScope: 'Credits stay with the sign-in method you buy them with. To use the same balance on desktop, sign in with this same Nimiq wallet — linking a wallet to an email is coming soon.',
   },
   es: {
     balance: 'Tus créditos',
@@ -59,6 +60,7 @@ const COPY = {
     empty: 'Aún no hay compras.',
     logout: 'Cerrar sesión',
     loginNeeded: 'Inicia sesión para comprar y usar créditos.',
+    accountScope: 'Los créditos quedan ligados al método con el que los compras. Para usar el mismo saldo en escritorio, inicia sesión con esta misma wallet de Nimiq — vincular wallet y email llegará pronto.',
   },
 } as const
 
@@ -170,6 +172,10 @@ export default function Credits() {
           {balance}
         </p>
         <p className="text-xs" style={{ color: 'var(--text-40)' }}>{user?.label}</p>
+        {/* Credits are keyed by AuthUser.id (wallet address OR email), so a
+            balance does not follow the user across sign-in methods. Disclose it
+            here, where the purchase decision is made — not only in the terms. */}
+        <p className="text-xs mt-2 mx-auto" style={{ color: 'var(--text-40)', maxWidth: '32rem' }}>{t.accountScope}</p>
         <div className="flex flex-wrap justify-center gap-2 mt-3">
           {highlights().map(item => (
             <span key={item} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'var(--highlight-bg)', color: 'var(--text-60)' }}>
@@ -236,9 +242,9 @@ export default function Credits() {
           <p className="text-xs text-center m-0" style={{ color: 'var(--text-40)' }}>
             {t.usdtNetwork}
           </p>
-          {/* TODO (USDT gas): mini apps get no gas abstraction, so USDT needs POL
-              for gas. Steering users to NIM for now. Revisit: test on-device or
-              drop the USDT rail (NIM-only) like other Nimiq mini apps. */}
+          {/* Mini apps get no gas abstraction, so USDT needs POL for gas — this
+              warning is required until we run a relayer. Confirmed limitation,
+              designed fix, and why we keep the rail: docs/usdt-gas-abstraction.md */}
           <p className="text-xs text-center m-0" style={{ color: 'var(--nimiq-gold)' }}>
             {t.usdtGas}
           </p>
