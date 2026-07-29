@@ -88,8 +88,9 @@ function BrandIcon({ path }: { path: string }) {
   )
 }
 
-/** Terms & conditions, hosted in the public repo until the in-app page ships. */
-const TERMS_URL = 'https://github.com/Lumacx-FCC/Nimiq-MiniApps/blob/main/otherme-app/docs/terms-and-conditions.md'
+/** Terms & conditions — the static page at public/terms/index.html. Firebase
+ *  serves static files before the SPA rewrite, so this is a real page, not a route. */
+const TERMS_URL = '/terms'
 
 const SOCIALS = [
   { key: 'email', label: 'info@othermeapp.com', href: 'mailto:info@othermeapp.com', icon: <Mail size={14} /> },
@@ -341,16 +342,14 @@ export default function Landing() {
           ))}
         </div>
         <p className="text-sm font-bold m-0" style={{ color: 'var(--text-60)' }}>{t.footer}</p>
-        {/* Interim: the terms live in the repo until the `[…]` placeholders clear
-            legal review and a Spanish version exists, at which point this becomes
-            an in-app /terms route (see docs/terms-and-conditions.md). */}
+        {/* Same-tab on purpose: `target="_blank"` is unreliable inside the Nimiq
+            Pay WebView, and /terms links back to othermeapp.com in its masthead.
+            Still English-only — see docs/terms-and-conditions.md. */}
         <p className="text-xs mt-1 m-0">
           <a
             className="no-underline hover:underline"
             style={{ color: 'var(--text-40)' }}
             href={TERMS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
           >
             {t.terms}
           </a>
