@@ -27,6 +27,19 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      {
+        "comment": "The flat /contest URL is already published in live social posts. It points at whichever promo is currently running. Type 302, NOT 301: the destination changes when a promo ends, and browsers cache a 301 permanently.",
+        "source": "/contest",
+        "destination": "/contest/show-your-character-2026-07",
+        "type": 302
+      },
+      {
+        "source": "/contest/",
+        "destination": "/contest/show-your-character-2026-07",
+        "type": 302
+      }
+    ],
     "rewrites": [
       {
         "source": "/api/**",

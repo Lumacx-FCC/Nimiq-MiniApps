@@ -1,12 +1,14 @@
 # Other Me — Terms & Conditions
 
-**Draft for legal review — not legal advice.** The factual statements below were
-written against the shipped code (2026-07-28) and are accurate to it. The legal
-framing, jurisdiction, and liability limits need a qualified review before this
-is published. Placeholders are marked `[…]`.
+**Not legal advice — and not yet reviewed by counsel.** The factual statements
+below were written against the shipped code (2026-07-28) and are accurate to it.
+All placeholders are now filled: operator is Other Me Labs (part of Studio Swai,
+San José, Costa Rica), governing law and venue are Costa Rica, and the liability
+cap is 3 months. **A Costa Rican legal review of the liability position and the
+consumer-law carve-out is still outstanding.**
 
-Last updated: 2026-07-28 · Operator: Other Me Labs `[legal entity, address]` ·
-Contact: info@othermeapp.com
+Last updated: 2026-07-28 · Operator: Other Me Labs — part of Studio Swai,
+San José, Costa Rica · Contact: info@othermeapp.com
 
 ---
 
@@ -59,7 +61,7 @@ ships, treat each sign-in method as a separate account.
   payment is verified on-chain, which normally takes under a minute but can take
   longer when a network is congested.
 - **All purchases are final and non-refundable**, except where a refund is
-  required by applicable consumer law `[review per jurisdiction]`.
+  required by applicable consumer law.
 - Paying with **USDT on Polygon requires you to hold POL** in the same wallet to
   cover the network's gas fee. This is a property of the Polygon network, not a
   charge by us. If you have no POL the transaction will fail; the credits are
@@ -225,7 +227,7 @@ a terminated account are forfeited.
   inside the Nimiq Pay wallet, USDT requiring POL for gas — are known
   constraints of the host platform, not defects.
 - To the maximum extent permitted by law, our total liability to you for any
-  claim is limited to the amount you paid us in the `[3]` months before the
+  claim is limited to the amount you paid us in the 3 months before the
   claim. We are not liable for lost data, lost profits, or indirect or
   consequential loss.
 - Nothing in these terms limits liability that cannot be limited by law.
@@ -239,8 +241,8 @@ data for othermeapp.com. To have server-side records associated with your wallet
 address deleted, contact us — note that on-chain transaction records cannot be
 deleted by anyone.
 
-These terms are governed by the laws of `[jurisdiction]`, and disputes are
-subject to `[venue / dispute process]`.
+These terms are governed by the laws of **Costa Rica**, and disputes are subject
+to the competent courts of Costa Rica.
 
 ---
 
@@ -260,8 +262,9 @@ Resolved:
 
 Still open before publishing:
 
-4. **Legal review** of jurisdiction, venue, liability cap, and consumer-law
-   carve-outs (all marked `[…]`).
+4. **Legal review** by Costa Rican counsel: the liability cap (§12) and the
+   consumer-law carve-out on refunds (§3) are still open (marked `[…]`).
+   Jurisdiction and venue are now set to Costa Rica.
 5. **Spanish translation**, once the English text is legally settled — the app is
    fully bilingual and a Spanish-speaking user should not have to accept English
    terms.

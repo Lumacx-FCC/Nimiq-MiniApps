@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms &amp; Conditions | Other Me</title>
+<meta name="description" content="Other Me Terms &amp; Conditions — what the app is, how accounts and credits work, what happens to your data, and where your creations are stored.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://othermeapp.com/terms">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Terms &amp; Conditions | Other Me">
+<meta property="og:description" content="What Other Me is, how accounts and credits work, and what happens to your data.">
+<meta property="og:url" content="https://othermeapp.com/terms">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Design tokens lifted from otherme-app/src/styles/global.css so this page
+   matches the app exactly. Light and dark both supported. */
+:root{
+  --nimiq-blue:#1f2348; --nimiq-gold:#e9b213; --nimiq-green:#21bca5;
+  --om-teal:#2ea3b4; --om-teal-deep:#12798c;
+  --page-gradient:linear-gradient(160deg,#f2f8fd 0%,#dcebf7 55%,#cfe4f4 100%);
+  --card:#ffffff;
+  --card-gradient:linear-gradient(165deg,#ffffff 0%,#f2f9fc 70%,#dff0f7 100%);
+  --text-100:rgba(31,35,72,1); --text-70:rgba(31,35,72,.7); --text-60:rgba(31,35,72,.6);
+  --hairline:rgba(31,35,72,.12); --highlight-bg:rgba(31,35,72,.05);
+  --radius-card:18px; --radius-button:500px;
+  --shadow:0 8px 30px rgba(31,35,72,.10);
+  --warn-bg:rgba(233,178,19,.10); --warn-br:rgba(233,178,19,.55);
+  --note-bg:rgba(46,163,180,.09); --note-br:rgba(46,163,180,.45);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --page-gradient:linear-gradient(160deg,#141731 0%,#171b3a 55%,#10132b 100%);
+    --card:#1f2348;
+    --card-gradient:linear-gradient(165deg,#23284f 0%,#1f2348 70%,#1a1e40 100%);
+    --text-100:rgba(255,255,255,.95); --text-70:rgba(255,255,255,.72); --text-60:rgba(255,255,255,.58);
+    --hairline:rgba(255,255,255,.14); --highlight-bg:rgba(255,255,255,.06);
+    --om-teal:#5cc6d6;
+    --shadow:0 8px 30px rgba(0,0,0,.45);
+    --warn-bg:rgba(233,178,19,.12); --warn-br:rgba(233,178,19,.5);
+    --note-bg:rgba(92,198,214,.10); --note-br:rgba(92,198,214,.4);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; padding:0;
+  font-family:'Mulish','Muli',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--page-gradient); background-attachment:fixed;
+  color:var(--text-100); line-height:1.62;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+.wrap{max-width:820px;margin:0 auto;padding:32px 20px 80px}
+
+/* header */
+header.masthead{display:flex;align-items:center;gap:14px;margin-bottom:34px}
+header.masthead img{width:46px;height:46px;display:block}
+.brand{font-weight:800;font-size:1.12rem;letter-spacing:-.01em}
+.brand a{color:inherit;text-decoration:none}
+.brand span{color:var(--om-teal)}
+.masthead nav{margin-left:auto;font-size:.9rem}
+.masthead nav a{color:var(--text-60);text-decoration:none;font-weight:600}
+.masthead nav a:hover{color:var(--om-teal)}
+
+/* hero */
+.hero{
+  background:var(--card-gradient);border:1px solid var(--hairline);
+  border-radius:var(--radius-card);box-shadow:var(--shadow);
+  padding:30px 28px;margin-bottom:12px;
+}
+.kicker{
+  font-size:.74rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--om-teal);margin:0 0 10px
+}
+h1{font-size:clamp(1.65rem,5vw,2.3rem);line-height:1.16;margin:0 0 12px;letter-spacing:-.02em}
+.lede{font-size:1.04rem;color:var(--text-70);margin:0}
+.dates{
+  display:inline-block;margin-top:16px;padding:7px 16px;border-radius:var(--radius-button);
+  background:var(--om-teal);color:#fff;font-weight:700;font-size:.92rem
+}
+
+/* draft banner */
+.draft{
+  border:1px dashed var(--warn-br);background:var(--warn-bg);
+  border-radius:12px;padding:12px 16px;margin:18px 0 26px;
+  font-size:.87rem;color:var(--text-70)
+}
+.draft strong{color:var(--text-100)}
+
+/* glance table */
+.glance{
+  background:var(--card);border:1px solid var(--hairline);border-radius:var(--radius-card);
+  box-shadow:var(--shadow);padding:6px 4px;margin:0 0 34px;overflow:hidden
+}
+.glance dl{margin:0;display:grid;grid-template-columns:minmax(96px,150px) 1fr}
+.glance dt{
+  padding:11px 18px;font-weight:700;font-size:.87rem;color:var(--text-60);
+  border-bottom:1px solid var(--hairline)
+}
+.glance dd{
+  margin:0;padding:11px 18px;font-size:.94rem;border-bottom:1px solid var(--hairline)
+}
+.glance dt:last-of-type,.glance dl>dd:last-child{border-bottom:0}
+/* stack label over value on narrow screens - a 150px label column leaves too
+   little room for the value at 375px */
+@media (max-width:520px){
+  .glance dl{grid-template-columns:1fr}
+  .glance dt{padding:11px 18px 0;border-bottom:0}
+  .glance dd{padding:2px 18px 11px}
+}
+
+/* toc */
+.toc{margin:0 0 40px;font-size:.93rem}
+.toc p{font-weight:700;margin:0 0 10px;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-60)}
+.toc ol{margin:0;padding:0;list-style:none;columns:2;column-gap:28px}
+@media (max-width:560px){.toc ol{columns:1}}
+.toc li{margin:0 0 6px;break-inside:avoid}
+.toc a{color:var(--text-70);text-decoration:none}
+.toc a:hover{color:var(--om-teal);text-decoration:underline}
+
+/* body */
+section{margin:0 0 34px;scroll-margin-top:20px}
+h2{
+  font-size:1.16rem;margin:0 0 12px;letter-spacing:-.01em;
+  padding-bottom:8px;border-bottom:1px solid var(--hairline)
+}
+h2 .num{color:var(--om-teal);font-weight:800;margin-right:8px}
+h3{font-size:1rem;margin:22px 0 8px}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin:0 0 7px}
+a{color:var(--om-teal-deep)}
+@media (prefers-color-scheme:dark){a{color:var(--om-teal)}}
+strong{font-weight:700}
+code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em;
+  background:var(--highlight-bg);padding:1px 6px;border-radius:5px
+}
+
+/* callouts */
+.callout{
+  border-radius:14px;padding:16px 20px;margin:20px 0;
+  border:1px solid var(--note-br);background:var(--note-bg)
+}
+.callout.warn{border-color:var(--warn-br);background:var(--warn-bg)}
+.callout h3{margin:0 0 8px;font-size:1rem}
+.callout p:last-child{margin-bottom:0}
+
+/* tables */
+.tbl{overflow-x:auto;margin:0 0 16px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:440px;font-size:.93rem}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--hairline);vertical-align:top}
+th{font-weight:700;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-60)}
+tbody tr:last-child td{border-bottom:0}
+.prize{font-weight:800;color:var(--om-teal-deep);white-space:nowrap}
+@media (prefers-color-scheme:dark){.prize{color:var(--om-teal)}}
+
+/* steps */
+ol.steps{list-style:none;padding:0;counter-reset:s}
+ol.steps li{
+  counter-increment:s;position:relative;padding-left:44px;margin-bottom:14px
+}
+ol.steps li::before{
+  content:counter(s);position:absolute;left:0;top:1px;
+  width:29px;height:29px;border-radius:50%;
+  background:var(--om-teal);color:#fff;font-weight:800;font-size:.87rem;
+  display:flex;align-items:center;justify-content:center
+}
+
+footer{
+  margin-top:52px;padding-top:24px;border-top:1px solid var(--hairline);
+  font-size:.86rem;color:var(--text-60)
+}
+footer p{margin:0 0 9px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <img src="data:image/png;base64,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" alt="Other Me" width="46" height="46">
+  <div class="brand"><a href="https://othermeapp.com">Other<span>Me</span></a></div>
+  <nav><a href="https://othermeapp.com">othermeapp.com</a></nav>
+</header>
+
+<div class="hero">
+  <p class="kicker">Legal</p>
+  <h1>Terms &amp; Conditions</h1>
+  <p class="lede">What Other Me is, how accounts and credits work, where your
+  creations actually live, and what we do and don’t do with your data.</p>
+</div>
+
+<div class="glance">
+  <dl>
+    <dt>Last updated</dt><dd>28 July 2026</dd>
+    <dt>Operator</dt><dd>Other Me Labs — part of Studio Swai, San José, Costa Rica</dd>
+    <dt>Contact</dt><dd><a href="mailto:info@othermeapp.com">info@othermeapp.com</a></dd>
+  </dl>
+</div>
+
+<div class="toc">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#s1">1. What Other Me is</a></li>
+    <li><a href="#s2">2. Your account depends on how you sign in</a></li>
+    <li><a href="#s3">3. Credits and payments</a></li>
+    <li><a href="#s4">4. Images you upload</a></li>
+    <li><a href="#s5">5. Content the app generates</a></li>
+    <li><a href="#s6">6. Where your data actually lives</a></li>
+    <li><a href="#s7">7. Conversations and voice</a></li>
+    <li><a href="#s8">8. Share links</a></li>
+    <li><a href="#s9">9. You are responsible for your own backups</a></li>
+    <li><a href="#s10">10. Third parties we send data to</a></li>
+    <li><a href="#s11">11. Prohibited use</a></li>
+    <li><a href="#s12">12. Availability, warranty, and liability</a></li>
+    <li><a href="#s13">13. Changes, termination, and law</a></li>
+  </ol>
+</div>
+
+<section id="s1">
+  <h2><span class="num">1.</span>What Other Me is</h2>
+  <p>Other Me is a creative tool that turns an image you provide into a character
+  sheet, and lets you place that character in scenes, generate short video clips,
+  and hold a spoken conversation with it. It runs as a web app at othermeapp.com
+  and as a mini app inside the Nimiq Pay wallet.</p>
+  <p>By uploading an image, buying credits, or starting a conversation you accept
+  these terms. If you don’t accept them, don’t use the app.</p>
+  <p><strong>Status.</strong> Other Me is early software, built for the Nimiq Mini
+  Apps Competition. Features, prices, and limits may change without notice.</p>
+</section>
+
+<section id="s2">
+  <h2><span class="num">2.</span>Your account depends on how you sign in</h2>
+  <div class="callout warn">
+    <h3>Read this before buying credits</h3>
+    <p>Other Me currently keeps a separate account for each sign-in method. Your
+    identity is the Nimiq wallet address you connect with, or the email address
+    you register with — they are <strong>not</strong> the same account, and they
+    are <strong>not</strong> linked.</p>
+  </div>
+  <p>Consequences you should expect:</p>
+  <ul>
+    <li>Credits bought with a Nimiq wallet inside Nimiq Pay belong to
+    <strong>that wallet address</strong>. Signing in later by email — in a desktop
+    browser, for example — gives you a <strong>different account with a different
+    balance</strong>, and your purchased credits will not appear there.</li>
+    <li>Email registration is currently stored <strong>on the device you
+    registered on</strong>. An email account created on your phone does not exist
+    on your desktop; you would have to register again there, creating yet another
+    separate account.</li>
+    <li>Credits are not transferable between accounts, and we cannot merge
+    accounts on request at this time.</li>
+  </ul>
+  <p>If you want your credits available on desktop, use the same Nimiq wallet
+  address you purchased with. Account linking is planned but not available yet;
+  until it ships, treat each sign-in method as a separate account.</p>
+</section>
+
+<section id="s3">
+  <h2><span class="num">3.</span>Credits and payments</h2>
+  <ul>
+    <li><strong>Credits are a prepaid access balance, not money, not a deposit,
+    and not a token.</strong> They carry no monetary value, earn no interest,
+    cannot be redeemed for cash, cannot be transferred, and are not a financial
+    product.</li>
+    <li>Purchases are <strong>real blockchain transactions</strong> you sign in
+    your own wallet: NIM on the Nimiq network, or USDT on Polygon. We never take
+    custody of your keys or your funds.</li>
+    <li><strong>Blockchain payments are irreversible.</strong> Once a transaction
+    confirms it cannot be recalled by us or by you. Credits are granted only after
+    the payment is verified on-chain, which normally takes under a minute but can
+    take longer when a network is congested.</li>
+    <li><strong>All purchases are final and non-refundable</strong>, except where
+    a refund is required by applicable consumer law.</li>
+    <li>Paying with <strong>USDT on Polygon requires you to hold POL</strong> in
+    the same wallet to cover the network’s gas fee. This is a property of the
+    Polygon network, not a charge by us. If you have no POL the transaction will
+    fail; the credits are not deducted and no payment is taken. NIM payments do
+    not have this requirement.</li>
+    <li>If a payment succeeds on-chain but credits do not appear, contact us with
+    the transaction hash and we will investigate.</li>
+    <li>Generation is <strong>charged per attempt, not per satisfactory
+    result.</strong> AI output is probabilistic; an image, clip, or reply you
+    dislike still consumes the credits it cost. We do not refund credits for
+    creative dissatisfaction.</li>
+    <li>Prices are shown before purchase and may change at any time. Promotional
+    pricing ends on the date stated at the time of the offer.</li>
+  </ul>
+</section>
+
+<section id="s4">
+  <h2><span class="num">4.</span>Images you upload</h2>
+  <p>You are responsible for what you upload. By uploading an image you confirm
+  that:</p>
+  <ul>
+    <li>you own it or have the rights to use it; and</li>
+    <li><strong>every identifiable person in it has consented</strong> to their
+    likeness being used to generate an AI character, including scenes, video, and
+    a synthetic voice; and</li>
+    <li>it does not depict a <strong>minor</strong>; and</li>
+    <li>you are not using it to impersonate a real person, to create sexual or
+    intimate imagery of anyone, or to produce content that is deceptive,
+    defamatory, harassing, or unlawful.</li>
+  </ul>
+  <p>We do not verify consent and cannot do so. If you upload someone else’s image
+  without permission, that is your responsibility, not ours.</p>
+  <p>We may refuse or stop processing any request, and may suspend access, where we
+  believe these terms are being broken. Our AI providers apply their own content
+  filters, which can reject a request independently of us.</p>
+</section>
+
+<section id="s5">
+  <h2><span class="num">5.</span>Content the app generates</h2>
+  <ul>
+    <li><strong>You own your creations</strong> — the character sheets, scene
+    images, video clips and transcripts you generate — to the extent they are
+    capable of being owned. We claim no ownership of them.</li>
+    <li><strong>AI output may not be copyrightable.</strong> In several
+    jurisdictions, work generated without sufficient human authorship cannot be
+    protected. We make no representation that you hold enforceable rights in any
+    generated asset.</li>
+    <li><strong>Output is not exclusive.</strong> Generative models can produce
+    similar or identical results for different users from similar prompts. We
+    cannot and do not guarantee uniqueness.</li>
+    <li>You are responsible for how you use, publish, or commercialise what you
+    generate, including complying with the terms of any platform you post it
+    to.</li>
+    <li>We do not use your images, characters, or conversations to train models,
+    and we do not currently collect analytics of any kind. If that changes we will
+    update these terms first.</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <h2><span class="num">6.</span>Where your data actually lives</h2>
+  <p>We keep as little as possible. Specifically:</p>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>What</th><th>Where it is stored</th><th>Who can see it</th></tr></thead>
+    <tbody>
+      <tr><td>Character sheets, custom avatars</td><td><strong>Your device</strong> (browser localStorage)</td><td>You</td></tr>
+      <tr><td>Scenes and video clips</td><td><strong>Your device</strong> (browser IndexedDB)</td><td>You</td></tr>
+      <tr><td>Conversations with your character</td><td><strong>Nowhere.</strong> Held in memory only, for the duration of the session</td><td>You, plus Google while the session is live (section 7)</td></tr>
+      <tr><td>Credit balance and purchase history</td><td>Your device, <strong>and</strong> our server when you sign in with a Nimiq wallet</td><td>You, us</td></tr>
+      <tr><td>Wallet address, transaction hashes, amounts, credits granted</td><td><strong>Our server</strong> (Firebase/Firestore)</td><td>You, us</td></tr>
+      <tr><td>Images sent for generation or analysis</td><td><strong>Not retained by us.</strong> Passed through to the AI provider and discarded</td><td>Our AI providers (section 10)</td></tr>
+      <tr><td>Files you create a share link for</td><td><strong>Our server</strong> (Firebase Storage), at a public URL (section 8)</td><td>Anyone with the link</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>We do not sell your data. We do not run advertising. We do not store your
+  uploaded images or your generated assets on our servers except where you
+  explicitly create a share link.</p>
+</section>
+
+<section id="s7">
+  <h2><span class="num">7.</span>Conversations and voice</h2>
+  <ul>
+    <li>Conversations with your character are <strong>not saved by us</strong>.
+    They exist only in your browser’s memory while the conversation is open, and
+    are lost when you reload the page, navigate away, or close the app. If you
+    want to keep a transcript, copy it yourself before leaving.</li>
+    <li>While a conversation is live, what you say or type — and your character’s
+    personality description — is sent <strong>directly from your device to
+    Google’s Gemini API</strong> in order to generate the reply and the voice. Our
+    servers do not see or store this exchange. Google’s handling of that data is
+    governed by Google’s terms, not ours.</li>
+    <li><strong>Voice input inside Nimiq Pay uses your device’s own speech
+    recognition</strong>, which on Android is provided by the operating system and
+    may transmit audio to the vendor of that speech service (for example Google)
+    for transcription. This is outside our control. If you would rather not use
+    it, type instead — your character still replies aloud.</li>
+    <li>Voices are <strong>synthetic</strong>. They are not recordings of, and are
+    not intended to imitate, any real person.</li>
+  </ul>
+</section>
+
+<section id="s8">
+  <h2><span class="num">8.</span>Share links</h2>
+  <p>When you share an image or clip from inside the Nimiq Pay wallet, the file is
+  uploaded to our storage and we give you a link. Please understand:</p>
+  <ul>
+    <li><strong>The link is public.</strong> Anyone who has it can open the file.
+    It is not password-protected and it is not indexed, but it is not private
+    either.</li>
+    <li>Do not create share links for anything you would not want a stranger to
+    see.</li>
+    <li><strong>Share links are temporary.</strong> Shared files are deleted
+    automatically once they are more than <strong>24 hours</strong> old, by a
+    scheduled job that runs daily. A link may therefore stop working up to a day
+    after the stated expiry, but it will stop working. Save anything you want to
+    keep before then.</li>
+    <li>You can ask us to delete a shared file sooner by contacting us with the
+    link.</li>
+  </ul>
+</section>
+
+<section id="s9">
+  <h2><span class="num">9.</span>You are responsible for your own backups</h2>
+  <p>This is the most important practical warning in this document.</p>
+  <p>Because your characters, scenes, and clips are stored <strong>in your
+  browser</strong>, they are permanently lost if you:</p>
+  <ul>
+    <li>clear your browser data, site data, or cache;</li>
+    <li>use private/incognito browsing;</li>
+    <li>uninstall or reset the wallet app or browser;</li>
+    <li>run out of device storage while saving; or</li>
+    <li>switch to a different device or browser.</li>
+  </ul>
+  <p>The same applies to the credit balance of an <strong>email-registered</strong>
+  account, which exists only on that device. A credit balance attached to a
+  <strong>Nimiq wallet address</strong> is held on our server as well and survives
+  losing the device, provided you sign in with the same wallet.</p>
+  <div class="callout warn">
+    <p><strong>Export anything you want to keep.</strong> We cannot recover lost
+    local data — we never had a copy of it.</p>
+  </div>
+  <p>Browser storage is also finite (roughly a few megabytes for characters). The
+  app warns you when a save fails. If you ignore that warning, the item is not
+  saved.</p>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10.</span>Third parties we send data to</h2>
+  <p>To generate anything, we must pass your content to AI providers:</p>
+  <ul>
+    <li><strong>OpenAI</strong> — image generation and editing, and character
+    personality text.</li>
+    <li><strong>Google (Gemini)</strong> — image analysis, video generation, and
+    the live voice conversation, which your browser connects to directly.</li>
+    <li><strong>Google Firebase</strong> — authentication, the credits ledger, and
+    share-link storage.</li>
+    <li><strong>Public blockchain infrastructure</strong> — Nimiq and Polygon
+    nodes, to verify your payments. Note that blockchain transactions are
+    <strong>public and permanent by design</strong>: the amount, the addresses,
+    and the timing of your purchase are visible to anyone, forever, and cannot be
+    deleted by us or by you.</li>
+    <li><strong>CoinGecko</strong> — the NIM/USD exchange rate shown on the
+    credits screen.</li>
+  </ul>
+  <p>Each provider processes data under its own terms. We do not control their
+  retention or their use of submitted content.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11.</span>Prohibited use</h2>
+  <p>Do not use Other Me to: create sexual content involving anyone, or any
+  content involving minors; impersonate a real person or organisation; produce
+  disinformation, fake evidence, or non-consensual intimate imagery; harass,
+  threaten, or defame; infringe copyright or trademarks; attempt to extract our
+  API keys, bypass the credits system, or attack the service; or break any
+  applicable law.</p>
+  <p>We may suspend or terminate access immediately for any of the above. Credits
+  on a terminated account are forfeited.</p>
+</section>
+
+<section id="s12">
+  <h2><span class="num">12.</span>Availability, warranty, and liability</h2>
+  <ul>
+    <li>The service is provided <strong>“as is” and “as available”</strong>,
+    without warranties of any kind. We do not promise it will be uninterrupted,
+    error-free, or that any particular output will be produced.</li>
+    <li>We depend on third-party AI providers and public blockchains. Their
+    outages, rate limits, content filters, and network congestion will affect the
+    app and are outside our control.</li>
+    <li>Features documented as limitations — no file downloads and no live
+    microphone inside the Nimiq Pay wallet, USDT requiring POL for gas — are known
+    constraints of the host platform, not defects.</li>
+    <li>To the maximum extent permitted by law, our total liability to you for any
+    claim is limited to the amount you paid us in the 3 months before the claim.
+    We are not liable for lost data, lost profits, or indirect or consequential
+    loss.</li>
+    <li>Nothing in these terms limits liability that cannot be limited by law.</li>
+  </ul>
+</section>
+
+<section id="s13">
+  <h2><span class="num">13.</span>Changes, termination, and law</h2>
+  <p>We may update these terms; material changes will be announced in the app or
+  at othermeapp.com, and continued use after that constitutes acceptance. You may
+  stop using the app at any time; you can delete your local data by clearing site
+  data for othermeapp.com. To have server-side records associated with your wallet
+  address deleted, contact us — note that on-chain transaction records cannot be
+  deleted by anyone.</p>
+  <p>These terms are governed by the laws of <strong>Costa Rica</strong>, and
+  disputes are subject to the competent courts of Costa Rica.</p>
+</section>
+
+<footer>
+  <p><strong>Last updated:</strong> 28 July 2026 · Operator: Other Me Labs —
+  part of Studio Swai, San José, Costa Rica ·
+  <a href="mailto:info@othermeapp.com">info@othermeapp.com</a></p>
+  <p><a href="https://othermeapp.com">othermeapp.com</a></p>
+</footer>
+
+</div>
+</body>
+</html>
