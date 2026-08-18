@@ -17,7 +17,8 @@ othermeapp.com (project `otherme-18f5b`) unless noted.
 | [#16](https://github.com/Lumacx-FCC/Nimiq-MiniApps/pull/16) | 07-25 | UX | Responsive subsections, header logo ratio, single language button |
 | [#17](https://github.com/Lumacx-FCC/Nimiq-MiniApps/pull/17) | 07-27 | UX + Pricing | Collapsible studio sections, gallery login target, socials, early-bird pricing |
 | *pending* | 07-27 | Docs | USDT gas-abstraction finding + relayer design (uncommitted) |
-| *pending* | 08-18 | UX | Gallery share parity, creator responsiveness, error modal, listening cue, voice dictation on prompts |
+| [#22](https://github.com/Lumacx-FCC/Nimiq-MiniApps/pull/22) | 08-18 | UX | Gallery share parity, creator responsiveness, error modal, listening cue, voice dictation on prompts |
+| *pending* | 08-18 | UX + Fix | Talk stage down to one action row; error pop-up z-index fix; custom avatar slot bug |
 
 ## Arc 1 — Payments moved from client-trust to server-authoritative (#8–#12)
 
@@ -82,7 +83,7 @@ Driven by testing inside Nimiq Pay on real phones.
   and `functions/src/config.ts`; the server is authoritative, so they move
   together.
 
-## Arc 4 — Creator-flow UX pass (pending, uncommitted)
+## Arc 4 — Creator-flow UX pass (#22)
 
 Five fixes requested after a fresh round of on-device testing, plus one bug
 found during that testing.
@@ -121,6 +122,37 @@ found during that testing.
   changes. Deferred past Cycle I: needs a hot wallet, nonce-safe sends, spend
   quotas, and a paid RPC. Design: [usdt-gas-abstraction.md](usdt-gas-abstraction.md).
   Comment/docs only — no behavior change; NIM and USDT flows untouched.
+
+## Arc 5 — Talk stage cleanup + two production bugs found by dogfooding (pending, uncommitted)
+
+Follow-up after #22 shipped to production and got real on-device use.
+
+- **Talk stage down to one action row.** Three independently-positioned
+  elements (Change Avatar, the listening pill, Begin/End) used to stack and
+  cover a third of the avatar once a session went live. `RoleplayStudio` now
+  renders exactly two elements side by side in `.stage-action-row`: the left
+  slot swaps between "Change Avatar" (idle) and the listening/speaking pill
+  (live), the right slot is always Begin/End. Verified at mobile and desktop
+  width in both languages — no label wraps or overflows.
+- **Fixed: the error pop-up could render invisibly behind another modal.**
+  `ErrorNotice` was `z-[95]`; `RoleplayStudio`'s upload modal is `z-index: 100`
+  and the toast is `z-index: 120`. An error firing while either was open
+  rendered correctly in the DOM but sat behind it, unseen. Confirmed live: the
+  "blocked by content safety filter" avatar-generation error was fully
+  invisible behind the still-open upload modal. Raised `ErrorNotice` to
+  `z-[200]`, above every other layer in the app.
+- **Fixed: creating a second custom avatar could silently overwrite the
+  first.** The Character Creator → Talk handoff
+  (`sessionStorage['otherme:avatar-reference']`) hardcoded `setUploadSlot(1)`
+  regardless of what already occupied slot 1. Now it computes the first empty
+  slot in `1..customSlotCount`, and flashes an error if every slot is full
+  instead of guessing. Verified: created a custom avatar in slot 1, replayed
+  the same handoff, and it correctly targeted slot 2.
+- **Confirmed, not a bug:** OpenAI's `gpt-image-2` does reject some reference
+  images as copyrighted characters (400 from `/api/generate-avatar`, e.g. a
+  Pikachu-styled sheet) — expected content-safety behavior on the provider
+  side. The gap was purely the invisible pop-up above; the server-side message
+  was already specific and correct.
 
 ## Known gaps carried forward
 
