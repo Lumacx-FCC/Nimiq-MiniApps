@@ -27,6 +27,8 @@ import { AVATAR_SPRITE_CREDITS } from '../core/config'
 import { listAvatars, persistAvatars } from '../roleplay/avatarLibrary'
 import type { AvatarProfile, ChatMessage, VoiceName } from '../roleplay/types'
 import { downloadDataUrl, downloadJson } from '../character/library'
+import ErrorNotice from '../components/ErrorNotice'
+import { getSpeechRecognizer, SpeechRecognizer } from '../core/speech'
 import '../styles/roleplay.css'
 
 const TEST_PHRASE = 'Hi there! What do you want to talk about today?'
@@ -401,45 +403,6 @@ async function removeChromaGreen(dataUrl: string) {
   return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png')
 }
 
-/**
- * Web Speech dictation — the voice-input fallback for the Nimiq Pay WebView.
- *
- * Confirmed on-device 2026-07-28 (Samsung Fold 5 / Android 16, WebView Chrome
- * 150) via `public/audio-check.html`: `getUserMedia` fails there with
- * `NotReadableError` ("could not start audio source") — NOT a denied
- * permission — so live PCM streaming to Gemini is impossible. But
- * `SpeechRecognition` DOES work, because Android's system speech service
- * captures audio in its own process rather than through the WebView. That
- * gives us hands-free voice in / voice out, at the cost of being turn-based.
- *
- * Typed only as far as we use it; the DOM lib ships no stable definitions.
- */
-interface SpeechAlternative { transcript: string }
-interface SpeechResult { readonly length: number, [index: number]: SpeechAlternative }
-interface SpeechResultList { readonly length: number, [index: number]: SpeechResult }
-interface SpeechResultEvent { resultIndex: number, results: SpeechResultList }
-interface SpeechErrorEvent { error: string }
-interface SpeechRecognizer {
-  lang: string
-  continuous: boolean
-  interimResults: boolean
-  maxAlternatives: number
-  onresult: ((event: SpeechResultEvent) => void) | null
-  onerror: ((event: SpeechErrorEvent) => void) | null
-  onend: (() => void) | null
-  start: () => void
-  stop: () => void
-  abort: () => void
-}
-
-function getSpeechRecognizer(): (new () => SpeechRecognizer) | null {
-  const scope = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognizer
-    webkitSpeechRecognition?: new () => SpeechRecognizer
-  }
-  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null
-}
-
 function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
@@ -493,7 +456,7 @@ export default function RoleplayStudio() {
   const [uploadName, setUploadName] = useState('')
   const [uploadSubject, setUploadSubject] = useState<SpriteSubject>('human')
   const [generating, setGenerating] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ text: string, isError: boolean } | null>(null)
   // Voice mode is running on Web Speech dictation instead of a live mic stream.
   const [dictation, setDictation] = useState(false)
 
@@ -583,8 +546,8 @@ export default function RoleplayStudio() {
       list.scrollTop = list.scrollHeight
   }, [messages])
 
-  const flash = useCallback((text: string) => {
-    setNotice(text)
+  const flash = useCallback((text: string, isError = false) => {
+    setNotice({ text, isError })
     window.setTimeout(() => setNotice(null), 4200)
   }, [])
 
@@ -937,7 +900,7 @@ export default function RoleplayStudio() {
             }
           },
           onerror: (error: ErrorEvent) => {
-            flash(error.message || 'Gemini Live connection error')
+            flash(error.message || 'Gemini Live connection error', true)
             void stopSession()
           },
           onclose: () => {
@@ -973,7 +936,10 @@ export default function RoleplayStudio() {
           // Inside Nimiq Pay this is where we land (NotReadableError). Web Speech
           // dictation still reaches the OS mic, so try it before falling back to
           // typing-only.
-          flash(startDictation(session) ? t.dictationOn : t.micUnavailable)
+          if (startDictation(session))
+            flash(t.dictationOn)
+          else
+            flash(t.micUnavailable, true)
           setLiveState('listening')
         }
       }
@@ -982,7 +948,7 @@ export default function RoleplayStudio() {
     catch (error) {
       setLiveState('idle')
       const message = error instanceof Error ? error.message : 'Unable to connect'
-      flash(`${t.demo}: ${message}`)
+      flash(`${t.demo}: ${message}`, true)
       return null
     }
   }, [activeAvatar.systemPrompt, clearOutput, flash, lang, playPcm, startDictation, startMicrophone, stopSession, t.demo, t.dictationOn, t.micUnavailable, voice])
@@ -1000,7 +966,7 @@ export default function RoleplayStudio() {
     if (liveState !== 'idle')
       return void stopSession()
     if (creditsApi.balance <= 0)
-      return flash(t.noCredits)
+      return flash(t.noCredits, true)
     await openSession(true, false)
   }
 
@@ -1010,7 +976,7 @@ export default function RoleplayStudio() {
     if (!text)
       return
     if (!sessionRef.current && creditsApi.balance <= 0)
-      return flash(t.noCredits)
+      return flash(t.noCredits, true)
     setDraft('')
     setMessages(current => [...current, { id: makeId(), role: 'user', text }])
     let session = sessionRef.current
@@ -1030,7 +996,7 @@ export default function RoleplayStudio() {
 
   const unlockSlots = () => {
     if (!creditsApi.spend(250))
-      return flash(t.insufficient)
+      return flash(t.insufficient, true)
     setExtraUnlocked(true)
     localStorage.setItem(EXTRA_SLOTS_KEY, 'true')
     flash(t.unlocked)
@@ -1040,7 +1006,7 @@ export default function RoleplayStudio() {
     if (!uploadFile || uploadSlot === null)
       return
     if (creditsApi.balance < AVATAR_SPRITE_CREDITS)
-      return flash(t.insufficientImageCredits)
+      return flash(t.insufficientImageCredits, true)
     setGenerating(true)
     try {
       const optimizedFile = await optimizeReferenceImage(uploadFile)
@@ -1092,12 +1058,16 @@ export default function RoleplayStudio() {
       setUploadName('')
       setUploadSubject('human')
       creditsApi.spend(AVATAR_SPRITE_CREDITS)
-      flash(persisted ? t.stored : t.storeFailed)
-      if (persisted)
+      if (persisted) {
+        flash(t.stored)
         window.setTimeout(() => flash(t.imageCost), 150)
+      }
+      else {
+        flash(t.storeFailed, true)
+      }
     }
     catch (error) {
-      flash(error instanceof Error ? error.message : 'Generation failed')
+      flash(error instanceof Error ? error.message : 'Generation failed', true)
     }
     finally {
       setGenerating(false)
@@ -1251,7 +1221,7 @@ export default function RoleplayStudio() {
 
           <div className="character-stage" style={{ backgroundImage: `linear-gradient(180deg, rgba(4,8,10,.08), rgba(4,8,10,.58)), url(${activeBackground.url})` }}>
             <div className="stage-vignette" />
-            <div className="live-status"><span className={liveState} />{liveState === 'idle' ? t.ready : liveState === 'connecting' ? t.connecting : liveState === 'speaking' ? t.speaking : t.listening}</div>
+            <div className={`live-status ${liveState}`}><span className={liveState} />{liveState === 'idle' ? t.ready : liveState === 'connecting' ? t.connecting : liveState === 'speaking' ? t.speaking : t.listening}</div>
             <SpriteAvatar spriteUrl={activeOutfit.spriteUrl} frame={mouthFrame} speaking={liveState === 'speaking'} />
             <div className="character-caption">
               <div><span>{t.talkingWith}</span><h1>{activeAvatar.name}</h1></div>
@@ -1260,6 +1230,12 @@ export default function RoleplayStudio() {
               <UserRound size={17} />
               {t.changeAvatar}
             </button>
+            {liveState === 'listening' && (
+              <div className="live-wave" role="status">
+                <span className="wave-bars"><span /><span /><span /><span /></span>
+                {t.listening}
+              </div>
+            )}
             <button className={`live-button ${liveState !== 'idle' ? 'active' : ''}`} onClick={toggleLive} disabled={liveState === 'connecting'}>
               {liveState === 'connecting' ? <LoaderCircle className="spin" size={20} /> : liveState === 'idle' ? <Mic size={20} /> : <MicOff size={20} />}
               {liveState === 'idle' ? t.live : liveState === 'connecting' ? t.connecting : t.end}
@@ -1344,7 +1320,9 @@ export default function RoleplayStudio() {
         </div>
       )}
 
-      {notice && <div className="toast"><Sparkles size={16} />{notice}</div>}
+      {notice && notice.isError
+        ? <ErrorNotice message={notice.text} lang={lang} onClose={() => setNotice(null)} />
+        : notice && <div className="toast"><Sparkles size={16} />{notice.text}</div>}
       {sidebarOpen && <div className="mobile-scrim" onClick={() => setSidebarOpen(false)} />}
     </main>
   )

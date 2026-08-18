@@ -18,6 +18,8 @@ import { SavedScene, SavedVideo, deleteMedia, listMedia, saveMedia } from '../co
 import AppHeader from '../components/AppHeader'
 import CollapsibleCard from '../components/CollapsibleCard'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
+import ErrorNotice from '../components/ErrorNotice'
+import MicButton from '../components/MicButton'
 
 function splitDataUrl(dataUrl: string): { base64: string, mimeType: string } {
   const [header, base64] = dataUrl.split(',')
@@ -288,8 +290,8 @@ export default function Videos() {
     <div className="page-shell wide">
       <AppHeader title={t.title} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="flex flex-col gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="flex flex-col gap-4 min-w-0">
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.pickCharacter}</h2>
             {!characters.length && <p className="text-sm mb-3" style={{ color: 'var(--text-60)' }}>{t.noneSaved} <button className="bg-transparent border-none underline cursor-pointer font-bold p-0" style={{ color: 'var(--om-teal)' }} onClick={() => navigate('/create')}>{t.goCreate}</button></p>}
@@ -299,13 +301,21 @@ export default function Videos() {
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-1" style={{ color: 'var(--text-40)' }}>{t.describe}</h2>
             <p className="text-xs mb-3" style={{ color: 'var(--text-40)' }}>{t.clipSpec}</p>
-            <textarea
-              className="w-full rounded-xl p-3 text-sm resize-y min-h-[90px] outline-none"
-              style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
-              value={action}
-              placeholder={t.placeholder}
-              onChange={e => setAction(e.target.value)}
-            />
+            <div className="relative">
+              <textarea
+                className="w-full rounded-xl p-3 pr-10 text-sm resize-y min-h-[90px] outline-none"
+                style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+                value={action}
+                placeholder={t.placeholder}
+                onChange={e => setAction(e.target.value)}
+              />
+              <MicButton
+                lang={lang}
+                className="absolute top-2 right-2 icon-chip !min-h-0 !min-w-0 !p-1.5"
+                onStart={() => setAction('')}
+                onResult={text => setAction(current => (current ? `${current} ${text}` : text))}
+              />
+            </div>
             <button className="om-button w-full mt-4" disabled={isGenerating || !action.trim()} onClick={generate}>
               {isGenerating ? <RefreshCw size={17} className="animate-spin" /> : <Wand2 size={17} />}
               {isGenerating ? t.generating : t.generate}
@@ -359,7 +369,7 @@ export default function Videos() {
           open={galleryOpen}
           onToggle={() => setGalleryOpen(!galleryOpen)}
           icon={<Video size={14} className="shrink-0" />}
-          className="h-fit"
+          className="h-fit min-w-0"
         >
           {!gallery.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[560px] overflow-y-auto pr-1">
@@ -383,11 +393,13 @@ export default function Videos() {
         </CollapsibleCard>
       </div>
 
-      {notice && (
-        <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
-          {notice.text}
-        </div>
-      )}
+      {notice && notice.type === 'error'
+        ? <ErrorNotice message={notice.text} lang={lang} onClose={() => setNotice(null)} />
+        : notice && (
+          <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
+            {notice.text}
+          </div>
+          )}
     </div>
   )
 }

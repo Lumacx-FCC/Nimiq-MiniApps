@@ -17,6 +17,7 @@ othermeapp.com (project `otherme-18f5b`) unless noted.
 | [#16](https://github.com/Lumacx-FCC/Nimiq-MiniApps/pull/16) | 07-25 | UX | Responsive subsections, header logo ratio, single language button |
 | [#17](https://github.com/Lumacx-FCC/Nimiq-MiniApps/pull/17) | 07-27 | UX + Pricing | Collapsible studio sections, gallery login target, socials, early-bird pricing |
 | *pending* | 07-27 | Docs | USDT gas-abstraction finding + relayer design (uncommitted) |
+| *pending* | 08-18 | UX | Gallery share parity, creator responsiveness, error modal, listening cue, voice dictation on prompts |
 
 ## Arc 1 — Payments moved from client-trust to server-authoritative (#8–#12)
 
@@ -81,8 +82,38 @@ Driven by testing inside Nimiq Pay on real phones.
   and `functions/src/config.ts`; the server is authoritative, so they move
   together.
 
-## Pending (uncommitted)
+## Arc 4 — Creator-flow UX pass (pending, uncommitted)
 
+Five fixes requested after a fresh round of on-device testing, plus one bug
+found during that testing.
+
+- **Gallery share parity** — the Characters tab in `/gallery` was missing the
+  Share action that Scenes and Videos already had; added, reusing the existing
+  `shareDataUrl` helper.
+- **Creator responsiveness** — `CharacterStudio`, `Scenes`, `Videos` only went
+  two-column at `lg` (1024px), so tablets (768–1023px) got a single stretched
+  column. Dropped the breakpoint to `md` (768px). Separately, opening the
+  Design Sheet's section-tab row (Identity/Face Design/…) could blow the whole
+  left column wider than the viewport — a classic CSS Grid min-width:auto trap,
+  since that row's non-wrapping content was several DOM levels below the grid
+  item. Fixed by switching the row to `flex-wrap` (all tabs always visible, no
+  scroll needed) and adding `min-width: 0` to every grid column on all three
+  pages, plus `overflow-x: hidden` on `.page-shell` as a backstop.
+- **Error visibility** — new `ErrorNotice.tsx` centered modal for actual
+  failures (generation errors, insufficient credits, connection errors),
+  replacing the easy-to-miss bottom-corner toast for those cases specifically;
+  routine status (saved, voice mode on) keeps the lighter toast.
+- **Listening indicator** (Talk with Avatar) — enlarged the top-left status
+  badge and added an animated sound-wave pill next to the mic button, shown
+  only while actively listening.
+- **Voice dictation on every prompt box** — extracted the Web Speech recognizer
+  RoleplayStudio already used into `src/core/speech.ts`, then built a reusable
+  `MicButton` and dropped it onto every text field across Character (all
+  design-sheet fields, custom style, video action), Scenes, and Videos.
+  Pressing the mic clears that field only, via a functional `setState` update —
+  an initial version used a plain closure and re-appended dictated text onto
+  the pre-clear value, because the recognizer's result arrives well after the
+  click, long after the click-time closure went stale.
 - **USDT gas abstraction** — documented the confirmed platform limitation (mini
   apps don't get Nimiq Pay's gas abstraction, so USDT needs POL) and corrected
   our own stale claim that a relayer was infeasible. It *is* viable via

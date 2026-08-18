@@ -28,6 +28,8 @@ import {
 } from '../character/fields'
 import { SavedSheet, compressImageDataUrl, deleteSheet, downloadDataUrl, listSheets, saveSheet, shareDataUrl } from '../character/library'
 import Lightbox from '../components/Lightbox'
+import ErrorNotice from '../components/ErrorNotice'
+import MicButton from '../components/MicButton'
 
 const FREE_COUNT_KEY = 'otherme:free-generations'
 const PENDING_REFERENCE_KEY = 'otherme:pending-reference'
@@ -319,9 +321,9 @@ export default function CharacterStudio() {
     <div className="page-shell wide">
       <AppHeader title={t.title} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {/* ---- Left: reference + form ---- */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 min-w-0">
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.step1}</h2>
             <div className="flex flex-col min-[420px]:flex-row gap-4 min-[420px]:items-stretch">
@@ -373,12 +375,12 @@ export default function CharacterStudio() {
 
           {sheetReady && (
           <CollapsibleCard title={t.fields} open={open.fields} onToggle={() => toggle('fields')}>
-            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
+            <div className="flex flex-wrap gap-1.5 mb-3">
               {SECTIONS.map(s => (
                 <button
                   key={s.id}
                   onClick={() => setActiveSection(s.id)}
-                  className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap"
                   style={activeSection === s.id
                     ? { background: 'var(--om-cta-bg)', color: '#fff' }
                     : { background: 'var(--highlight-bg)', color: 'var(--text-60)' }}
@@ -393,13 +395,21 @@ export default function CharacterStudio() {
                 <label className="text-[11px] font-extrabold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-60)' }}>
                   {field.label[lang]}
                 </label>
-                <textarea
-                  className="w-full rounded-xl p-2.5 text-sm resize-y min-h-[56px] outline-none border"
-                  style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)', borderColor: 'transparent' }}
-                  value={formData[field.key] || ''}
-                  placeholder={field.placeholder}
-                  onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                />
+                <div className="relative">
+                  <textarea
+                    className="w-full rounded-xl p-2.5 pr-10 text-sm resize-y min-h-[56px] outline-none border"
+                    style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)', borderColor: 'transparent' }}
+                    value={formData[field.key] || ''}
+                    placeholder={field.placeholder}
+                    onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                  />
+                  <MicButton
+                    lang={lang}
+                    className="absolute top-2 right-2 icon-chip !min-h-0 !min-w-0 !p-1.5"
+                    onStart={() => setFormData(current => ({ ...current, [field.key]: '' }))}
+                    onResult={text => setFormData(current => ({ ...current, [field.key]: current[field.key] ? `${current[field.key]} ${text}` : text }))}
+                  />
+                </div>
               </div>
             ))}
           </CollapsibleCard>
@@ -407,7 +417,7 @@ export default function CharacterStudio() {
         </div>
 
         {/* ---- Right: prompt, generation, result, library, video ---- */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 min-w-0">
           {sheetReady && (
           <CollapsibleCard
             title={t.prompt}
@@ -444,14 +454,22 @@ export default function CharacterStudio() {
                 ))}
               </div>
               {renderStyle.mode === 'custom' && (
-                <input
-                  className="w-full rounded-xl p-2.5 text-sm outline-none mt-2"
-                  style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
-                  value={renderStyle.customText}
-                  placeholder={t.stylePlaceholder}
-                  maxLength={160}
-                  onChange={e => setRenderStyle({ ...renderStyle, customText: e.target.value })}
-                />
+                <div className="relative mt-2">
+                  <input
+                    className="w-full rounded-xl p-2.5 pr-10 text-sm outline-none"
+                    style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+                    value={renderStyle.customText}
+                    placeholder={t.stylePlaceholder}
+                    maxLength={160}
+                    onChange={e => setRenderStyle({ ...renderStyle, customText: e.target.value })}
+                  />
+                  <MicButton
+                    lang={lang}
+                    className="absolute top-1/2 -translate-y-1/2 right-2 icon-chip !min-h-0 !min-w-0 !p-1.5"
+                    onStart={() => setRenderStyle(current => ({ ...current, customText: '' }))}
+                    onResult={text => setRenderStyle(current => ({ ...current, customText: current.customText ? `${current.customText} ${text}`.slice(0, 160) : text.slice(0, 160) }))}
+                  />
+                </div>
               )}
             </div>
 
@@ -550,12 +568,20 @@ export default function CharacterStudio() {
               </button>
             </div>
             <label className="text-[11px] font-extrabold uppercase tracking-wider block mb-1" style={{ color: 'var(--text-60)' }}>{t.videoAction}</label>
-            <textarea
-              className="w-full rounded-xl p-2.5 text-sm resize-y min-h-[56px] outline-none"
-              style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
-              value={videoAction}
-              onChange={e => setVideoAction(e.target.value)}
-            />
+            <div className="relative">
+              <textarea
+                className="w-full rounded-xl p-2.5 pr-10 text-sm resize-y min-h-[56px] outline-none"
+                style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+                value={videoAction}
+                onChange={e => setVideoAction(e.target.value)}
+              />
+              <MicButton
+                lang={lang}
+                className="absolute top-2 right-2 icon-chip !min-h-0 !min-w-0 !p-1.5"
+                onStart={() => setVideoAction('')}
+                onResult={text => setVideoAction(current => (current ? `${current} ${text}` : text))}
+              />
+            </div>
             <div className="flex items-center justify-between mt-2 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-40)' }}>Output</span>
               <button className="icon-chip !text-xs" onClick={() => copyText(videoPrompt, 'video')}>
@@ -576,11 +602,13 @@ export default function CharacterStudio() {
 
       {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
 
-      {notice && (
-        <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
-          {notice.text}
-        </div>
-      )}
+      {notice && notice.type === 'error'
+        ? <ErrorNotice message={notice.text} lang={lang} onClose={() => setNotice(null)} />
+        : notice && (
+          <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
+            {notice.text}
+          </div>
+          )}
     </div>
   )
 }
