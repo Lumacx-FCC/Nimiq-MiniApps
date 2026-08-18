@@ -126,6 +126,7 @@ const COPY = {
     freeSlots: 'Custom slots',
     addCharacter: 'Add character',
     unlock: 'Unlock 5 more slots',
+    slotsFull: 'All custom slots are full — remove one to add this character.',
     credits: 'credits',
     outfit: 'Outfit',
     scene: 'Scene',
@@ -186,6 +187,7 @@ const COPY = {
     freeSlots: 'Espacios personalizados',
     addCharacter: 'Agregar personaje',
     unlock: 'Desbloquear 5 espacios',
+    slotsFull: 'Todos los espacios personalizados están llenos — elimina uno para agregar este personaje.',
     credits: 'créditos',
     outfit: 'Atuendo',
     scene: 'Escena',
@@ -502,12 +504,20 @@ export default function RoleplayStudio() {
     sessionStorage.removeItem(AVATAR_HANDOFF_KEY)
     try {
       const { imageDataUrl, name } = JSON.parse(raw) as { imageDataUrl: string, name: string }
+      const usedSlots = new Set(customAvatars.map(item => item.slot))
+      let nextSlot = 1
+      while (usedSlots.has(nextSlot) && nextSlot <= customSlotCount)
+        nextSlot++
+      if (nextSlot > customSlotCount) {
+        flash(t.slotsFull, true)
+        return
+      }
       const { base64, mimeType } = splitDataUrl(imageDataUrl)
       const bytes = base64ToBytes(base64)
       const file = new File([bytes], `${(name || 'character').replace(/\s+/g, '-')}.png`, { type: mimeType })
       setUploadFile(file)
       setUploadName(name || '')
-      setUploadSlot(1)
+      setUploadSlot(nextSlot)
     }
     catch { /* malformed handoff — ignore */ }
   }, [])
@@ -1226,20 +1236,25 @@ export default function RoleplayStudio() {
             <div className="character-caption">
               <div><span>{t.talkingWith}</span><h1>{activeAvatar.name}</h1></div>
             </div>
-            <button className="change-avatar-button" onClick={changeAvatar}>
-              <UserRound size={17} />
-              {t.changeAvatar}
-            </button>
-            {liveState === 'listening' && (
-              <div className="live-wave" role="status">
-                <span className="wave-bars"><span /><span /><span /><span /></span>
-                {t.listening}
-              </div>
-            )}
-            <button className={`live-button ${liveState !== 'idle' ? 'active' : ''}`} onClick={toggleLive} disabled={liveState === 'connecting'}>
-              {liveState === 'connecting' ? <LoaderCircle className="spin" size={20} /> : liveState === 'idle' ? <Mic size={20} /> : <MicOff size={20} />}
-              {liveState === 'idle' ? t.live : liveState === 'connecting' ? t.connecting : t.end}
-            </button>
+            <div className="stage-action-row">
+              {liveState === 'listening' || liveState === 'speaking'
+                ? (
+                  <div className="live-wave" role="status">
+                    <span className="wave-bars"><span /><span /><span /><span /></span>
+                    {liveState === 'speaking' ? t.speaking : t.listening}
+                  </div>
+                  )
+                : (
+                  <button className="change-avatar-button" onClick={changeAvatar}>
+                    <UserRound size={17} />
+                    {t.changeAvatar}
+                  </button>
+                  )}
+              <button className={`live-button ${liveState !== 'idle' ? 'active' : ''}`} onClick={toggleLive} disabled={liveState === 'connecting'}>
+                {liveState === 'connecting' ? <LoaderCircle className="spin" size={20} /> : liveState === 'idle' ? <Mic size={20} /> : <MicOff size={20} />}
+                {liveState === 'idle' ? t.live : liveState === 'connecting' ? t.connecting : t.end}
+              </button>
+            </div>
           </div>
         </section>
 
