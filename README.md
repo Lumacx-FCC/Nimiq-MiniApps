@@ -171,3 +171,9 @@ In priority order, from 1 Aug 2026. Full detail in the
 ## License
 
 MIT — see the competition rules for details.
+
+## NIM Wallet for tips and support
+
+NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F
+
+Any questions contact us info@othermeapp.com 

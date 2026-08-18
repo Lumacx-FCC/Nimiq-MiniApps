@@ -67,6 +67,8 @@ The wallet's Android WebView supports **no file downloads** (no download listene
 - `src/app/providers.tsx` — app-wide theme (default dark) and language (default EN, en/es) contexts; every page shows both toggles via `AppHeader`. Pages hold their own `COPY = { en: {...}, es: {...} }` dictionaries keyed by the global lang.
 - Pages = modules: `Landing` (mockup-faithful; logged-in users get a character gallery with Scene/Video/Talk actions), `CharacterStudio` (cascade flow: upload → analyze → sheet → generate → save reveals sections progressively), `Scenes`, `Videos`, `RoleplayStudio` (Aeternum port), `Login`, `Credits`.
 - `src/components/ReferencePicker.tsx` — shared by Scenes/Videos: attach saved characters + uploaded images, max 3 total.
+- `src/components/ErrorNotice.tsx` — centered error modal used for actual failures (generation errors, insufficient credits, connection errors); routine status stays on the existing bottom toast. Wired into CharacterStudio, Scenes, Videos, RoleplayStudio.
+- `src/components/MicButton.tsx` + `src/core/speech.ts` — shared Web Speech dictation: `speech.ts` holds the `getSpeechRecognizer()`/`SpeechRecognizer` typing (also used by RoleplayStudio's turn-based voice fallback), `MicButton` drops a dictation button onto any text field. `onStart` must clear that field via a functional `setState` update (not a value closed over at render time) — the recognizer result arrives well after the click, so a plain closure re-appends onto stale pre-clear text.
 
 ### Cross-module conventions
 

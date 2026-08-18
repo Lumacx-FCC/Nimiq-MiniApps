@@ -138,11 +138,23 @@
 .rp-root .character-stage { position: relative; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background-size: cover; background-position: center; box-shadow: 0 30px 70px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.02); container-type: inline-size; }
 .rp-root .character-stage::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 25%, rgba(2,4,5,.18) 64%, rgba(2,4,5,.62) 100%); pointer-events: none; z-index: 2; }
 .rp-root .stage-vignette { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(2,4,5,.16), transparent 50%, rgba(2,4,5,.72)); }
-.rp-root .live-status { position: absolute; top: 15px; left: 16px; z-index: 5; height: 29px; padding: 0 10px; display: flex; align-items: center; gap: 7px; border-radius: 999px; background: rgba(4,8,9,.58); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(12px); color: #b7c5c1; text-transform: uppercase; letter-spacing: .1em; font-size: 8px; }
-.rp-root .live-status > span { width: 6px; height: 6px; border-radius: 50%; background: #71817d; }
+.rp-root .live-status { position: absolute; top: 15px; left: 16px; z-index: 5; height: 34px; padding: 0 13px; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: rgba(4,8,9,.58); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(12px); color: #b7c5c1; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; transition: background .2s, border-color .2s; }
+.rp-root .live-status > span { width: 8px; height: 8px; border-radius: 50%; background: #71817d; flex-shrink: 0; }
 .rp-root .live-status > span.listening { background: #69e5c1; box-shadow: 0 0 10px #69e5c1; animation: rp-pulse 1.5s infinite; }
 .rp-root .live-status > span.speaking { background: #d5b871; box-shadow: 0 0 10px #d5b871; animation: rp-pulse .7s infinite; }
 .rp-root .live-status > span.connecting { border: 1px solid #69e5c1; border-top-color: transparent; animation: rp-spin .8s linear infinite; background: transparent; }
+.rp-root .live-status.listening { background: rgba(24,64,52,.72); border-color: rgba(105,229,193,.5); color: #d6fff1; box-shadow: 0 0 22px rgba(105,229,193,.22); }
+
+/* Sound-wave bars next to the mic button — the "conversation is live" cue
+   the top-left badge alone was too easy to miss mid-conversation. */
+.rp-root .live-wave { position: absolute; z-index: 6; right: 20px; bottom: 74px; display: flex; align-items: center; gap: 9px; padding: 8px 14px; border-radius: 999px; background: rgba(24,64,52,.78); border: 1px solid rgba(105,229,193,.5); backdrop-filter: blur(12px); color: #d6fff1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; box-shadow: 0 10px 30px rgba(18,132,101,.28); animation: rp-fadeIn .2s ease; }
+.rp-root .live-wave .wave-bars { display: flex; align-items: center; gap: 2.5px; height: 16px; }
+.rp-root .live-wave .wave-bars > span { width: 3px; height: 100%; border-radius: 999px; background: #69e5c1; animation: rp-wave 1s ease-in-out infinite; }
+.rp-root .live-wave .wave-bars > span:nth-child(1) { animation-delay: 0s; }
+.rp-root .live-wave .wave-bars > span:nth-child(2) { animation-delay: .15s; }
+.rp-root .live-wave .wave-bars > span:nth-child(3) { animation-delay: .3s; }
+.rp-root .live-wave .wave-bars > span:nth-child(4) { animation-delay: .45s; }
+@keyframes rp-wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
 /* Keep the avatar visually proportional on every screen. Height is the single
    governing dimension (width:auto + aspect-ratio derives a perfect square):
    - Target/max: the smaller of 75% stage height and 65% stage width
@@ -309,6 +321,7 @@
   .rp-root .character-caption h1 { font-size: 29px; }
   .rp-root .live-button { left: 20px; right: 20px; width: calc(100% - 40px); }
   .rp-root .change-avatar-button { left: 20px; right: 20px; width: calc(100% - 40px); bottom: 76px; }
+  .rp-root .live-wave { left: 20px; right: 20px; bottom: 130px; justify-content: center; }
   .rp-root .conversation-panel { min-height: 620px; border-left: 0; border-top: 1px solid var(--line); grid-template-rows: auto auto 1fr; padding: 10px; }
   .rp-root .voice-grid { grid-template-columns: repeat(3, 1fr); }
   .rp-root .voice-option > svg { display: none; }

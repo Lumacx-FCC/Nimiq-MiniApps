@@ -18,6 +18,8 @@ import AppHeader from '../components/AppHeader'
 import CollapsibleCard from '../components/CollapsibleCard'
 import Lightbox from '../components/Lightbox'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
+import ErrorNotice from '../components/ErrorNotice'
+import MicButton from '../components/MicButton'
 
 const FREE_SCENES_KEY = 'otherme:free-scenes'
 const VIDEO_REFERENCE_KEY = 'otherme:video-reference'
@@ -230,8 +232,8 @@ export default function Scenes() {
     <div className="page-shell wide">
       <AppHeader title={t.title} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="flex flex-col gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="flex flex-col gap-4 min-w-0">
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.pickCharacter}</h2>
             {!characters.length && <p className="text-sm mb-3" style={{ color: 'var(--text-60)' }}>{t.noneSaved} <button className="bg-transparent border-none underline cursor-pointer font-bold p-0" style={{ color: 'var(--om-teal)' }} onClick={() => navigate('/create')}>{t.goCreate}</button></p>}
@@ -240,13 +242,21 @@ export default function Scenes() {
 
           <section className="om-card">
             <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.describe}</h2>
-            <textarea
-              className="w-full rounded-xl p-3 text-sm resize-y min-h-[90px] outline-none"
-              style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
-              value={description}
-              placeholder={t.placeholder}
-              onChange={e => setDescription(e.target.value)}
-            />
+            <div className="relative">
+              <textarea
+                className="w-full rounded-xl p-3 pr-10 text-sm resize-y min-h-[90px] outline-none"
+                style={{ background: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+                value={description}
+                placeholder={t.placeholder}
+                onChange={e => setDescription(e.target.value)}
+              />
+              <MicButton
+                lang={lang}
+                className="absolute top-2 right-2 icon-chip !min-h-0 !min-w-0 !p-1.5"
+                onStart={() => setDescription('')}
+                onResult={text => setDescription(current => (current ? `${current} ${text}` : text))}
+              />
+            </div>
             <h3 className="text-[11px] font-extrabold uppercase tracking-wider mt-4 mb-2" style={{ color: 'var(--text-60)' }}>{t.styleTitle}</h3>
             <div className="flex gap-1.5 flex-wrap">
               {([['realistic', t.styleRealistic], ['animated', t.styleAnimated], ['custom', t.styleCustom]] as const).map(([mode, label]) => (
@@ -306,7 +316,7 @@ export default function Scenes() {
           open={galleryOpen}
           onToggle={() => setGalleryOpen(!galleryOpen)}
           icon={<Clapperboard size={14} className="shrink-0" />}
-          className="h-fit"
+          className="h-fit min-w-0"
         >
           {!gallery.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 max-h-[540px] overflow-y-auto pr-1">
@@ -336,11 +346,13 @@ export default function Scenes() {
 
       {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
 
-      {notice && (
-        <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
-          {notice.text}
-        </div>
-      )}
+      {notice && notice.type === 'error'
+        ? <ErrorNotice message={notice.text} lang={lang} onClose={() => setNotice(null)} />
+        : notice && (
+          <div className={`nq-notice ${notice.type} fixed bottom-6 left-1/2 -translate-x-1/2 z-50 shadow-xl max-w-md`} role="status" style={{ background: 'var(--nq-card)' }}>
+            {notice.text}
+          </div>
+          )}
     </div>
   )
 }

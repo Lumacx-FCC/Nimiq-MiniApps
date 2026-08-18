@@ -161,6 +161,7 @@ export default function Gallery() {
                   <button className="icon-chip !min-h-[30px] !min-w-0 !px-2 !text-[11px]" onClick={() => sceneFromCharacter(c.id)}><ImagePlus size={12} />{t.scene}</button>
                   <button className="icon-chip !min-h-[30px] !min-w-0 !px-2 !text-[11px]" onClick={() => videoFromCharacter(c.id)}><Video size={12} />{t.video}</button>
                   <button className="icon-chip !min-h-[30px] !min-w-0 !px-2 !text-[11px]" onClick={() => talkWith(c.imageDataUrl, c.name)}><MessageCircle size={12} />{t.talk}</button>
+                  {c.imageDataUrl && <button className="icon-chip !min-h-[30px] !min-w-0 !px-2" title={t.share} onClick={() => void shareDataUrl(c.imageDataUrl!, `${slug(c.name)}.webp`, { footer: true })}><Share2 size={12} /></button>}
                   <button className="icon-chip !min-h-[30px] !min-w-0 !px-2" title={t.del} onClick={() => removeCharacter(c.id)}><Trash2 size={12} style={{ color: 'var(--nimiq-red)' }} /></button>
                 </div>
               </figcaption>

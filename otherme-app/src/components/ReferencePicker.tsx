@@ -94,7 +94,7 @@ export default function ReferencePicker({ characters, scenes, value, onChange, l
         </span>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      <div className="flex gap-2 overflow-x-auto pb-2 scroll-fade">
         {characters.map((sheet) => {
           const selected = value.some(item => item.id === sheet.id)
           return (
@@ -130,7 +130,7 @@ export default function ReferencePicker({ characters, scenes, value, onChange, l
           <span className="text-[11px] font-extrabold uppercase tracking-wider block mb-2" style={{ color: 'var(--text-60)' }}>
             {t.savedScenes}
           </span>
-          <div className="flex gap-2 overflow-x-auto pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 scroll-fade">
             {scenes.map((scene) => {
               const selected = value.some(item => item.id === scene.id)
               return (
