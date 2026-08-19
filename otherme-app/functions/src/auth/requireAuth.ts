@@ -54,6 +54,33 @@ export async function requireUid(req: Request, res: Response): Promise<string | 
   return uid;
 }
 
+/**
+ * Resolve the caller's uid, requiring the `admin: true` custom claim — the
+ * only way to reach it is functions/scripts/set-admin-claim.mjs, run by hand
+ * against a trusted uid; nothing in the app grants it. Sends 403 (not 401)
+ * when authenticated but not an admin, distinct from "not signed in at all".
+ */
+export async function requireAdmin(req: Request, res: Response): Promise<string | null> {
+  const header = req.headers.authorization || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  try {
+    const decoded = await getAuth().verifyIdToken(match[1], true);
+    if (!(decoded as { admin?: boolean }).admin) {
+      res.status(403).json({ error: "Admin access required" });
+      return null;
+    }
+    return decoded.uid;
+  }
+  catch {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+}
+
 /** Custom-token sign-in (mintSessionToken) and a native provider sign-in both
  * stamp a fresh `auth_time` — this works uniformly for all three providers, no
  * per-provider branching needed. */

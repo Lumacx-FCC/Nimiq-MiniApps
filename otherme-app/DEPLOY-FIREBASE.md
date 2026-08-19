@@ -7,6 +7,11 @@ IndexedDB) as-is.
 
 **Deferred to after the hackathon** (not needed to be live): Firestore data model,
 cross-device sync, and server-side credit verification. Those are the "full migration".
+**Update:** all three have since shipped — see `docs/server-side-credits.md` (server-side
+credit verification, Phases 1-5) and the account-linking/cloud-sync work in
+`CLAUDE.md`'s "Before production" section (Firestore users model, cross-device sync for
+character sheets + avatars). This doc is kept as a historical record of the initial lean
+deploy; treat the rest of it as "how we got live," not current state.
 
 Legend: 🧑 = you do it (account/billing/DNS) · 🤖 = Claude does it in the repo (on "go")
 
@@ -104,18 +109,22 @@ This yields a live `*.web.app` URL to smoke-test before wiring the domain.
 ---
 
 ## Config decisions before deploy  🧑 (tell Claude)
-- **Prices:** `src/core/config.ts` currently uses TEST prices (÷100, e.g. $0.01/60 credits).
-  Keeping them low is actually judge-friendly (cheap to test). Confirm keep-as-is vs production
-  ($1/$5/$20).
+- **Prices:** ~~`src/core/config.ts` currently uses TEST prices (÷100, e.g. $0.01/60 credits)~~
+  — **done**: `src/core/config.ts` now holds real early-bird production prices (live since
+  2026-07-27), not the ÷100 test values described here.
 - **Treasuries:** the NIM + EVM treasury addresses in `config.ts` are shared TEST accounts.
-  Swap to **your own** addresses if you want to keep the funds from real purchases.
+  Swap to **your own** addresses if you want to keep the funds from real purchases. **Still
+  open** — this one hasn't shipped yet (see backlog Tier 1.4).
 
 ## Known limitations of the lean deploy (accepted for now)
-- **Data stays on-device** (localStorage/IndexedDB): no cross-device sync; clearing app data
-  loses a user's characters/scenes. Fixed by the full Firestore migration later.
-- **Credits are still granted client-side** after a tx hash (forgeable). Fine for a demo; if a
-  judge might probe it, pulling **server-side credit verification** forward is the one upgrade
-  worth considering before submission.
+- ~~**Data stays on-device**~~ — **done**: character sheets and custom avatars now sync to
+  Firestore + Storage for logged-in users (localStorage/IndexedDB kept as a read-through
+  cache). Scenes/videos are still on-device only, deliberately deferred (backlog Tier 2.2).
+- ~~**Credits are still granted client-side**~~ — **done** for the reconciled path: a
+  server-side reconciler is now the sole granter for USDT orders, verified on-chain before
+  crediting. NIM still uses the temporary client-trusting grant path pending the RPC secrets
+  (see `docs/server-side-credits.md` and backlog Tier 1.5) — that specific gap is real and
+  still open, the rest of this bullet is not.
 - **Cold starts:** first API call after idle may take a few seconds (2nd-gen Functions,
   min-instances 0). Set min-instances 1 only if you want to pay to avoid it.
 

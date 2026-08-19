@@ -2,11 +2,13 @@
  * Shared header: OM logo (home navigation), credits pill when logged in,
  * theme + language toggles. Present on every page.
  */
-import { Coins, Home, Images, LogOut, Moon, Sun, User } from 'lucide-react'
+import { Coins, Home, Images, LogOut, Moon, ShieldCheck, Sun, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
 import { useCredits } from '../core/credits'
+import { isAdmin } from '../core/admin'
 
 export default function AppHeader({ title }: { title?: string }) {
   const { theme, toggleTheme, lang, toggleLang } = useSettings()
@@ -15,6 +17,15 @@ export default function AppHeader({ title }: { title?: string }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const isHome = pathname === '/'
+
+  const [admin, setAdmin] = useState(false)
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setAdmin(false)
+      return
+    }
+    isAdmin().then(setAdmin)
+  }, [isLoggedIn])
 
   return (
     <header className="flex items-center justify-between gap-2 mb-4">
@@ -63,6 +74,16 @@ export default function AppHeader({ title }: { title?: string }) {
             title={lang === 'es' ? 'Perfil' : 'Profile'}
           >
             <User size={16} />
+          </Link>
+        )}
+        {admin && pathname !== '/promos_management' && (
+          <Link
+            to="/promos_management"
+            className="icon-chip no-underline"
+            aria-label="Promos management"
+            title="Promos management"
+          >
+            <ShieldCheck size={16} />
           </Link>
         )}
         <button className="icon-chip" onClick={toggleTheme} aria-label={lang === 'es' ? 'Cambiar tema' : 'Toggle theme'}>

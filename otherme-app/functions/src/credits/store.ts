@@ -17,7 +17,7 @@ export const WELCOME_CREDITS = 5;
 const MAX_IMPORT = 1_000_000;
 const HISTORY_LIMIT = 25;
 
-export type LedgerKind = "welcome" | "migrate" | "purchase" | "spend" | "link-merge";
+export type LedgerKind = "welcome" | "migrate" | "purchase" | "spend" | "link-merge" | "promo";
 
 export interface LedgerEntry {
   delta: number;
@@ -169,5 +169,41 @@ export async function recordPurchase(
       note: `${amount} ${method}`,
     } satisfies LedgerEntry);
     return { balance: balance + grant, alreadyRecorded: false };
+  });
+}
+
+/**
+ * Admin-granted credits (e.g. contest prizes, support credits) — writes
+ * through the same ledger shape as recordPurchase()/grantOrder() so balance
+ * and history never drift. Idempotent by dedupeKey (the ledger entry doc id):
+ * granting the same dedupeKey twice is a safe no-op, so a retried admin call
+ * can't double-credit.
+ */
+export async function grantPromo(
+  address: string,
+  credits: number,
+  note: string,
+  dedupeKey: string,
+): Promise<{ balance: number; alreadyGranted: boolean }> {
+  const grant = Math.max(0, Math.floor(credits));
+  const entryId = `promo-${dedupeKey}`;
+
+  return db().runTransaction(async (tx) => {
+    const ref = userRef(address);
+    const entryDoc = entriesRef(address).doc(entryId);
+    const [userSnap, entrySnap] = await Promise.all([tx.get(ref), tx.get(entryDoc)]);
+    const balance = userSnap.exists ? (userSnap.data()!.balance ?? 0) : 0;
+
+    if (entrySnap.exists)
+      return { balance, alreadyGranted: true }; // idempotent
+
+    tx.set(ref, { nimAddress: address, balance: balance + grant }, { merge: true });
+    tx.set(entryDoc, {
+      delta: grant,
+      kind: "promo",
+      at: Date.now(),
+      note: String(note).slice(0, 200),
+    } satisfies LedgerEntry);
+    return { balance: balance + grant, alreadyGranted: false };
   });
 }

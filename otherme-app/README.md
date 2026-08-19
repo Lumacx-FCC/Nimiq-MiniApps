@@ -15,7 +15,8 @@ as live voice avatars. Credits are purchased with **USDT (Polygon)** or
 | `/talk` | Avatar Studio — Gemini Live voice, lip-synced sprites | login; 1 credit/min, 3/sprite |
 | `/login` | Nimiq wallet (primary) / real email+password / Google | — |
 | `/credits` | Balance, USDT/NIM top-up, history | login required |
-| `/profile` | Linked identities, account linking (pairing code), unlink | login required |
+| `/profile` | Linked identities, account linking (pairing code), unlink, UID + copy button (for promotions) | login required |
+| `/promos_management` | Grant credits to an arbitrary address (contest prizes, support credits) | admin only (custom claim) |
 
 Character sheets and custom avatars sync to Firestore + Storage once signed
 in, with localStorage as a read-through cache (`src/character/library.ts`,
@@ -54,7 +55,9 @@ cloudflared tunnel --url http://localhost:5174
 
 Open the tunnel URL in Nimiq Pay → Mini Apps. Testnet NIM: long-press the
 Nimiq Pay settings button 10s → switch to Testnet → "Get free NIM".
-Prices are at TEST levels (÷100) — see `src/core/config.ts`.
+Prices are live early-bird production prices — see `src/core/config.ts`.
+Treasury addresses are still the shared team test pair, not yet swapped for
+production ones.
 
 ## Roadmap — from 1 Aug 2026 (after the competition)
 
@@ -115,7 +118,7 @@ So users don't need POL for gas. Mini apps don't get Nimiq Pay's own gas
 abstraction; confirmed limitation and full design in
 [docs/usdt-gas-abstraction.md](docs/usdt-gas-abstraction.md).
 
-### 6. Live microphone inside Nimiq Pay
+### 6. Live microphone inside Nimiq Pay — ✅ closed, no further action
 
 Blocked on the wallet: `getUserMedia` fails there with `NotReadableError`, so we
 ship Web Speech dictation as a turn-based fallback (see the root README).
@@ -127,17 +130,26 @@ one audio input with an empty label — and `SpeechRecognition` succeeding in th
 same session. Since the system speech service can capture while the WebView
 cannot, the gap is Nimiq Pay's own Android mic grant, not the WebView bridge.
 
-**Next action: file this with the Nimiq team** — the two reports, the
-`WebChromeClient.onPermissionRequest` snippet, and the iOS/WKWebView equivalent.
-Not yet sent.
+The two reports, the `WebChromeClient.onPermissionRequest` snippet, and the
+iOS/WKWebView equivalent were the only outstanding work here — closed 19 Aug
+2026, no code change needed.
 
-### 7. Terms & conditions
+### 7. Terms & conditions — ✅ shipped, one optional item left
 
-[`docs/terms-and-conditions.md`](docs/terms-and-conditions.md) is drafted,
-factually accurate, and linked from the Landing footer. Still needs legal review
-of the `[…]` placeholders, a Spanish translation, and promotion from a repo link
-to an in-app `/terms` route (optionally with a first-purchase acceptance
-checkpoint recorded server-side, if legal advises one).
+Live at `/terms` (`public/terms/index.html`, static — no SPA rewrite involved)
+and linked from the Landing footer. Now bilingual: a pill toggle (matching the
+app's `.icon-chip` styling) switches every section between English and
+Spanish, persisting to the same `localStorage['otherme:lang']` key the React
+app uses. Legal review of the content is accepted as-is (Lucas's call, not
+blocking).
+
+Still optional, not scheduled: a first-purchase acceptance checkpoint recorded
+server-side, if ever needed.
+
+**Known content drift, flagged not fixed**: a few sections (account linking,
+where character data lives) still describe the state *before* item 1 and item
+4 shipped — worth a content pass before the next `/terms` update, since it's a
+legal-accuracy call, not a translation one.
 
 ### 8. Smaller items found along the way
 
@@ -145,26 +157,24 @@ checkpoint recorded server-side, if legal advises one).
   the runtime service account lacks `storage.objects.delete`, the job logs an
   error and reports `deleted: 0` while appearing healthy. Force one run from
   Cloud Scheduler and read `[cleanupShares]` in `run.googleapis.com/stderr`.
-- **Login redirect notices are language-frozen.** The notice is passed to
-  `/login` as an already-resolved string (e.g. `RoleplayStudio.tsx`,
-  `Scenes.tsx`, `Videos.tsx` all inline `lang === 'es' ? … : …`), so switching
-  language after a redirect leaves the previous language on screen — reproduced:
-  a Spanish notice on an English login page. Fix is to pass a copy key and
-  resolve it in `Login.tsx`; six call sites across five files.
-- **Persist the mic error across page loads.** `RoleplayStudio` stashes the
-  `getUserMedia` failure on `window.__omMicError`, but `audio-check.html` is a
-  separate document so it can never read it. Use `sessionStorage` instead.
 - **Don't build "record audio in-app" on the `capture` attribute.** On-device,
   the Nimiq Pay WebView **ignores** `<input type="file" accept="audio/*" capture>`
   and opens the ordinary file chooser, so the realistic flow is "pick an existing
   audio file", not "record now". Dictation is the better path.
-- Pin `@nimiq/mini-app-sdk` — currently `"latest"` against a 0.x package.
 - Real Node host for `server/api.ts` handlers (they only use fetch/env, so
   they're portable).
+- Single-source the pricing/treasury constants duplicated in `src/core/config.ts`
+  and `functions/src/config.ts` (each has its own "KEEP IN SYNC" comment today).
+  Real build-tooling work — the client is Vite-bundled, the server a separately
+  deployed Functions package — not a quick fix.
 
 Done since the last revision of this list: on-chain tx verification before
-granting credits, signed-challenge wallet login, production prices and
-treasuries, automatic deletion of share-link files, Web Speech dictation as the
-in-wallet voice fallback, the credits-per-sign-in-method disclosure, real
-Firebase Auth for email/Google, account linking (item 1), and cloud sync for
-character sheets + avatars (item 4, Stage 1).
+granting credits, signed-challenge wallet login, production prices, automatic
+deletion of share-link files, Web Speech dictation as the in-wallet voice
+fallback, the credits-per-sign-in-method disclosure, real Firebase Auth for
+email/Google, account linking (item 1), cloud sync for character sheets +
+avatars (item 4, Stage 1), a Spanish translation + EN/ES toggle for `/terms`
+(item 7), an admin-gated credit-grant endpoint + `/promos_management` page for
+contest/promo payouts, a UID-with-copy row on `/profile`, pinning
+`@nimiq/mini-app-sdk`, fixing the language-frozen login redirect notices, and
+persisting the mic error to `sessionStorage` so `audio-check.html` can read it.

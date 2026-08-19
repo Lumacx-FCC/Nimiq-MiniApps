@@ -227,7 +227,7 @@ export default function CharacterStudio() {
 
   const generate = async () => {
     if (!canGenerate) {
-      navigate('/login', { state: { notice: t.freeOver, redirectTo: '/create' } })
+      navigate('/login', { state: { noticeKey: 'freeOver', redirectTo: '/create' } })
       return
     }
     if (isLoggedIn && creditsApi.balance < SHEET_RENDER_CREDITS) {
@@ -559,13 +559,13 @@ export default function CharacterStudio() {
             <div className="flex gap-2 mb-4">
               <button
                 className="om-button blue flex-1 !min-h-[42px] !text-sm"
-                onClick={() => navigate(isLoggedIn ? '/scenes' : '/login', isLoggedIn ? undefined : { state: { notice: t.loginFirstFeature, redirectTo: '/scenes' } })}
+                onClick={() => navigate(isLoggedIn ? '/scenes' : '/login', isLoggedIn ? undefined : { state: { noticeKey: 'unlockFeature', redirectTo: '/scenes' } })}
               >
                 <Clapperboard size={15} />{t.createScene}
               </button>
               <button
                 className="om-button flex-1 !min-h-[42px] !text-sm"
-                onClick={() => navigate(isLoggedIn ? '/videos' : '/login', isLoggedIn ? undefined : { state: { notice: t.loginFirstFeature, redirectTo: '/videos' } })}
+                onClick={() => navigate(isLoggedIn ? '/videos' : '/login', isLoggedIn ? undefined : { state: { noticeKey: 'unlockFeature', redirectTo: '/videos' } })}
               >
                 <Video size={15} />{t.createVideo}
               </button>

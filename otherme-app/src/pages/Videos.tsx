@@ -175,7 +175,7 @@ export default function Videos() {
 
   useEffect(() => {
     if (!isLoggedIn)
-      navigate('/login', { state: { redirectTo: '/videos', notice: lang === 'es' ? 'Inicia sesión primero para desbloquear esta función' : 'Log in first to unlock this feature' } })
+      navigate('/login', { state: { redirectTo: '/videos', noticeKey: 'unlockFeature' } })
   }, [isLoggedIn, navigate, lang])
 
   useEffect(() => {

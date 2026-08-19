@@ -4,6 +4,7 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Credits from './pages/Credits'
 import Profile from './pages/Profile'
+import PromosManagement from './pages/PromosManagement'
 import CharacterStudio from './pages/CharacterStudio'
 import RoleplayStudio from './pages/RoleplayStudio'
 import Scenes from './pages/Scenes'
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/credits" element={<Credits />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/promos_management" element={<PromosManagement />} />
         <Route path="/create" element={<CharacterStudio />} />
         <Route path="/talk" element={<RoleplayStudio />} />
         <Route path="/scenes" element={<Scenes />} />

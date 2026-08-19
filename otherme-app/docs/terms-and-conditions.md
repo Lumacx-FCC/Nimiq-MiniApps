@@ -1,11 +1,15 @@
 # Other Me — Terms & Conditions
 
-**Not legal advice — and not yet reviewed by counsel.** The factual statements
-below were written against the shipped code (2026-07-28) and are accurate to it.
-All placeholders are now filled: operator is Other Me Labs (part of Studio Swai,
-San José, Costa Rica), governing law and venue are Costa Rica, and the liability
-cap is 3 months. **A Costa Rican legal review of the liability position and the
-consumer-law carve-out is still outstanding.**
+**Superseded by the live page.** `public/terms/index.html` at `/terms` is now
+the authoritative, bilingual (EN/ES) version users actually see — this file is
+the historical English-only draft it was built from, kept for reference.
+
+**Not legal advice.** The factual statements below were written against the
+shipped code (2026-07-28) and are accurate to it. All placeholders are now
+filled: operator is Other Me Labs (part of Studio Swai, San José, Costa Rica),
+governing law and venue are Costa Rica, and the liability cap is 3 months.
+Costa Rican legal review of the liability position and the consumer-law
+carve-out is **accepted as-is** — Lucas's call, not blocking.
 
 Last updated: 2026-07-28 · Operator: Other Me Labs — part of Studio Swai,
 San José, Costa Rica · Contact: info@othermeapp.com
