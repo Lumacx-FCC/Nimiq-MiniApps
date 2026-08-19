@@ -4,7 +4,7 @@
  * normal login (see core/accountLink.ts doc comment) rather than building a
  * separate reauthenticateWithCredential/-Popup path.
  */
-import { Coins, KeyRound, Link2, Mail, Unlink, User, Wallet } from 'lucide-react'
+import { Check, Coins, Copy, KeyRound, Link2, Mail, Unlink, User, Wallet } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
@@ -21,6 +21,10 @@ const COPY = {
     loginNeeded: 'Log in to manage your profile.',
     balance: 'Your credits',
     signedInAs: 'Signed in as',
+    uid: 'UID',
+    uidHint: 'Use this for promotions instead of your wallet address or email',
+    copyUid: 'Copy UID',
+    copied: 'Copied',
     connected: 'Connected logins',
     noneLinked: 'No other logins linked yet.',
     unlink: 'Unlink',
@@ -49,6 +53,10 @@ const COPY = {
     loginNeeded: 'Inicia sesión para gestionar tu perfil.',
     balance: 'Tus créditos',
     signedInAs: 'Sesión iniciada como',
+    uid: 'UID',
+    uidHint: 'Úsalo para promociones en lugar de tu dirección de wallet o email',
+    copyUid: 'Copiar UID',
+    copied: 'Copiado',
     connected: 'Cuentas conectadas',
     noneLinked: 'Aún no has vinculado otras cuentas.',
     unlink: 'Desvincular',
@@ -100,6 +108,7 @@ export default function Profile() {
 
   const [reauthTarget, setReauthTarget] = useState<string | null>(null)
   const [reauthPassword, setReauthPassword] = useState('')
+  const [uidCopied, setUidCopied] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn)
@@ -217,6 +226,15 @@ export default function Profile() {
 
   const minutesLeft = (expiresAt: number) => Math.max(0, Math.ceil((expiresAt - Date.now()) / 60000))
 
+  const copyUid = () => {
+    if (!user?.id)
+      return
+    navigator.clipboard.writeText(user.id).then(() => {
+      setUidCopied(true)
+      window.setTimeout(() => setUidCopied(false), 1500)
+    })
+  }
+
   return (
     <div className="page-shell">
       <AppHeader />
@@ -229,6 +247,19 @@ export default function Profile() {
           {overview?.balance ?? '—'}
         </p>
         <p className="text-xs" style={{ color: 'var(--text-40)' }}>{t.signedInAs}: {user?.label}</p>
+        <div className="flex items-center justify-center gap-1.5 mt-1">
+          <p className="text-xs" style={{ color: 'var(--text-40)' }}>{t.uid}: {user?.id}</p>
+          <button
+            className="icon-chip"
+            style={{ minHeight: 0, minWidth: 0, padding: 5 }}
+            onClick={copyUid}
+            aria-label={t.copyUid}
+            title={t.copyUid}
+          >
+            {uidCopied ? <Check size={12} /> : <Copy size={12} />}
+          </button>
+        </div>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-40)' }}>{t.uidHint}</p>
       </div>
 
       <CollapsibleCard

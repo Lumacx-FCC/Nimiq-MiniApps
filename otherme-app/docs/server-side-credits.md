@@ -396,8 +396,10 @@ the instant this commits.
    import keyed by address, guarded so it cannot be farmed).
 3. Flip spends and grants to server-authoritative; `localStorage` becomes
    display-only.
-4. Set production treasuries + real prices (replace the ÷100 test values and
-   team treasury addresses in [`src/core/config.ts`](../src/core/config.ts)).
+4. Set production treasuries + real prices. **Prices done** — `src/core/config.ts`
+   now holds real early-bird prices, not the ÷100 test values this originally
+   described. **Treasuries still open** — the shared team test addresses are
+   still live in [`src/core/config.ts`](../src/core/config.ts).
 
 ---
 

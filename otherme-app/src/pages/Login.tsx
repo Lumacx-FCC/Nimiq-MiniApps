@@ -12,8 +12,6 @@ import AppHeader from '../components/AppHeader'
 const COPY = {
   en: {
     title: 'Welcome to Other Me',
-    // Was "One account for characters, avatars and credits" — untrue: credits and
-    // saved work are keyed per sign-in method and are not yet linked.
     subtitle: 'Sign in to save characters, avatars and credits.',
     nimiq: 'Continue with Nimiq Wallet',
     nimiqHint: 'Opens the native wallet dialog — no password needed.',
@@ -26,7 +24,7 @@ const COPY = {
     switchToSignUp: 'New here? Create an account',
     switchToLogIn: 'Already have an account? Log in',
     google: 'Continue with Google',
-    accountScope: 'Credits and saved characters stay with the sign-in method you choose — a wallet balance won’t appear under an email login yet. Account linking is coming soon.',
+    accountScope: 'Credits and saved characters stay with the sign-in method you choose by default — link another login from your Profile page to combine balances across a wallet, email, and Google.',
     forgotPassword: 'Forgot password?',
     resetSent: 'If an account exists for that email, a reset link is on its way.',
     resetNeedsEmail: 'Enter your email above first, then tap "Forgot password?"',
@@ -45,10 +43,29 @@ const COPY = {
     switchToSignUp: '¿Nuevo aquí? Crea una cuenta',
     switchToLogIn: '¿Ya tienes cuenta? Inicia sesión',
     google: 'Continuar con Google',
-    accountScope: 'Los créditos y personajes guardados quedan ligados al método que elijas — un saldo de wallet aún no aparece en un inicio de sesión por email. La vinculación de cuentas llegará pronto.',
+    accountScope: 'Los créditos y personajes guardados quedan ligados al método que elijas por defecto — vincula otro inicio de sesión desde tu perfil para combinar saldos entre wallet, email y Google.',
     forgotPassword: '¿Olvidaste tu contraseña?',
     resetSent: 'Si existe una cuenta con ese email, un enlace para restablecerla está en camino.',
     resetNeedsEmail: 'Escribe tu email arriba primero y luego toca "¿Olvidaste tu contraseña?"',
+  },
+} as const
+
+/** Redirect notices, keyed so Login.tsx resolves them against its own live
+ * `lang` at render time instead of the caller baking in a string at navigate()
+ * time (which used to freeze the notice in whatever language was active on
+ * the page that redirected here). */
+const NOTICE_COPY = {
+  freeOver: {
+    en: 'Free generations used — log in to continue',
+    es: 'Generaciones gratis agotadas — inicia sesión para continuar',
+  },
+  unlockFeature: {
+    en: 'Log in first to unlock this feature',
+    es: 'Inicia sesión primero para desbloquear esta función',
+  },
+  talkLogin: {
+    en: 'Log in to talk and create',
+    es: 'Inicia sesión para hablar y crear',
   },
 } as const
 
@@ -69,7 +86,7 @@ export default function Login() {
   const t = COPY[lang]
   const navigate = useNavigate()
   const location = useLocation()
-  const state = (location.state || {}) as { notice?: string, redirectTo?: string }
+  const state = (location.state || {}) as { noticeKey?: keyof typeof NOTICE_COPY, redirectTo?: string }
   const { isBusy, error, canUseNimiq, canUseGoogle, loginWithNimiq, loginWithGoogle, loginWithEmail, signUpWithEmail, requestPasswordReset } = useAuth()
 
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -107,11 +124,11 @@ export default function Login() {
       <div className="om-card">
         <h1 className="text-2xl font-extrabold text-center mb-1">{t.title}</h1>
         <p className="text-sm text-center mb-3" style={{ color: 'var(--text-60)' }}>{t.subtitle}</p>
-        {/* Credits are keyed per sign-in method (wallet address vs email) and are
-            not linked yet — say so before the user picks one. */}
+        {/* Credits are keyed per sign-in method by default; linking (Profile page)
+            merges them — say so before the user picks a sign-in method. */}
         <p className="text-xs text-center mb-5" style={{ color: 'var(--text-40)' }}>{t.accountScope}</p>
 
-        {state.notice && <div className="nq-notice info mb-4" role="status">{state.notice}</div>}
+        {state.noticeKey && <div className="nq-notice info mb-4" role="status">{NOTICE_COPY[state.noticeKey][lang]}</div>}
 
         <button className="om-button blue w-full" disabled={isBusy} onClick={async () => finish(await loginWithNimiq())}>
           <Wallet size={18} />

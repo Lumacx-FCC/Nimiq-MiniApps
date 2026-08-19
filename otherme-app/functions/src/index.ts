@@ -17,6 +17,7 @@ import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { handleGrantCredits } from "./admin/routes.js";
 import { handleLinkCommit, handleLinkRedeemPreview, handleLinkStart, handleUnlink } from "./account/routes.js";
 import { handleAccountResolve, handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
 import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
@@ -511,6 +512,9 @@ router.post("/credits/record-purchase", json, wrap(handleRecordPurchase));
 // Payment intents (Phase 3). The reconciler (Phase 4) verifies claimed txs.
 router.post("/orders", json, wrap(handleCreateOrder));
 router.post("/orders/:id/claim", json, wrap(handleClaimOrder));
+
+// Admin-only credit grants (contest prizes, support credits). See admin/routes.ts.
+router.post("/admin/grant-credits", json, wrap(handleGrantCredits));
 
 // Mounted twice: "/api/*" for the Hosting rewrite and the run.app direct URL;
 // "/*" for the cloudfunctions.net URL, which strips the function-name segment

@@ -100,7 +100,7 @@ function dump() { document.getElementById('out').textContent = log.join('\n'); }
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   row('env', 'SpeechRecognition', !!SR);
   row('env', 'Web Share', !!navigator.share);
-  var prior = window.__omMicError;
+  var prior = sessionStorage.getItem('om:lastMicError') || window.__omMicError;
   if (prior) row('env', 'Last mic error in app', prior, 'bad');
 
   if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {

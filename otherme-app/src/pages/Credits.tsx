@@ -36,7 +36,7 @@ const COPY = {
     empty: 'No purchases yet.',
     logout: 'Log out',
     loginNeeded: 'Log in to buy and use credits.',
-    accountScope: 'Credits stay with the sign-in method you buy them with. To use the same balance on desktop, sign in with this same Nimiq wallet — linking a wallet to an email is coming soon.',
+    accountScope: 'Credits stay with the sign-in method you buy them with by default. To use the same balance elsewhere, sign in the same way, or link another login from your Profile page.',
   },
   es: {
     balance: 'Tus créditos',
@@ -60,7 +60,7 @@ const COPY = {
     empty: 'Aún no hay compras.',
     logout: 'Cerrar sesión',
     loginNeeded: 'Inicia sesión para comprar y usar créditos.',
-    accountScope: 'Los créditos quedan ligados al método con el que los compras. Para usar el mismo saldo en escritorio, inicia sesión con esta misma wallet de Nimiq — vincular wallet y email llegará pronto.',
+    accountScope: 'Los créditos quedan ligados al método con el que los compras por defecto. Para usar el mismo saldo en otro lugar, inicia sesión de la misma forma, o vincula otro inicio de sesión desde tu perfil.',
   },
 } as const
 

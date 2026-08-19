@@ -10,7 +10,7 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
-    "@nimiq/mini-app-sdk": "latest",
+    "@nimiq/mini-app-sdk": "0.1.0",
     "viem": "^2.21.0",
     "vue": "^3.4.0"
   },

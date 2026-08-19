@@ -3,7 +3,8 @@
  * decides prices, treasuries, and the amount owed for an order.
  *
  * KEEP IN SYNC with otherme-app/src/core/config.ts (packs, treasuries, bonus).
- * These are the test values; replace treasuries + prices for production.
+ * PACKS below are live production prices. NIM_TREASURY_ADDRESS/EVM_TREASURY_ADDRESS
+ * are still the shared test pair — replace before real purchases should count as revenue.
  */
 export const NIM_TREASURY_ADDRESS = "NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F";
 export const EVM_TREASURY_ADDRESS = "0xdA5727CEb6bc093f22F6d56b75F5B3773Fbdf4D1";
@@ -29,11 +30,11 @@ export const POLYGON_RPC_DEFAULT = "https://polygon-rpc.com";
 
 /**
  * Public Nimiq Albatross RPC used when NIMIQ_RPC_URL is unset. NimiqWatch runs a
- * history node (answers getTransactionByHash for older txs) — INTERIM only,
- * until our own node is up (see docs/server-side-credits.md §A). A third-party
- * RPC is a trust + availability dependency; override it with the NIMIQ_RPC_URL
- * secret pointing at our VM once that's live. Set to "" to disable NIM
- * verification (orders stay skipped).
+ * history node (answers getTransactionByHash for older txs). A third-party RPC is
+ * a trust + availability dependency, accepted as a known, permanent tradeoff — a
+ * self-hosted RPC VM was considered and cancelled (backlog Tier 2.4). Set
+ * NIMIQ_RPC_URL to override if NimiqWatch becomes unreliable; set to "" to
+ * disable NIM verification (orders stay skipped).
  */
 export const NIMIQ_RPC_DEFAULT = "https://rpc.nimiqwatch.com";
 

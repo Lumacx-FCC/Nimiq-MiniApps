@@ -61,6 +61,10 @@ long-press Nimiq Pay's settings button 10s → switch to Testnet → "Get free N
 1. Replace the placeholder treasury addresses in `src/modules/config.ts`.
 2. Move credit granting server-side: verify the tx hash on-chain before
    crediting (`useCredits.ts` documents the seam). Never trust client balances.
+   Done for `otherme-app` (its own Firebase Functions backend verifies on-chain
+   and grants credits server-side) — this Vue demo app has no backend of its
+   own, so the item still applies here.
 3. Add a signed-challenge step to wallet login (`sign()`) for backend sessions.
+   Same as above: shipped in `otherme-app`, still open for this demo app.
 4. Google login: backend redirect flow via external browser for in-WebView use.
 5. Node 22+ on dev machines (currently pinned to Vite 5 for Node 18).

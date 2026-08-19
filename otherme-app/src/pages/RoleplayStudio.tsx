@@ -493,7 +493,7 @@ export default function RoleplayStudio() {
   // Talking requires an account (real credits back every minute).
   useEffect(() => {
     if (!isLoggedIn)
-      navigate('/login', { state: { redirectTo: '/talk', notice: lang === 'es' ? 'Inicia sesión para hablar y crear' : 'Log in to talk and create' } })
+      navigate('/login', { state: { redirectTo: '/talk', noticeKey: 'talkLogin' } })
   }, [isLoggedIn, navigate, lang])
 
   // Character Creator handoff: pre-fill the upload modal with the sheet image.
@@ -945,7 +945,10 @@ export default function RoleplayStudio() {
           const name = error instanceof Error ? error.name : 'UnknownError'
           const detail = error instanceof Error ? error.message : String(error)
           console.warn('[mic] getUserMedia failed:', name, detail)
-          ;(window as unknown as { __omMicError?: string }).__omMicError = `${name}: ${detail}`
+          const micErrorDetail = `${name}: ${detail}`
+          ;(window as unknown as { __omMicError?: string }).__omMicError = micErrorDetail
+          // window.__omMicError doesn't survive navigating to the separate audio-check.html document — sessionStorage does.
+          try { sessionStorage.setItem('om:lastMicError', micErrorDetail) } catch {}
           // Inside Nimiq Pay this is where we land (NotReadableError). Web Speech
           // dictation still reaches the OS mic, so try it before falling back to
           // typing-only.

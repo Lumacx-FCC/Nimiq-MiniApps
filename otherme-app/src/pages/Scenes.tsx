@@ -135,7 +135,7 @@ export default function Scenes() {
 
   useEffect(() => {
     if (!isLoggedIn)
-      navigate('/login', { state: { redirectTo: '/scenes', notice: lang === 'es' ? 'Inicia sesión primero para desbloquear esta función' : 'Log in first to unlock this feature' } })
+      navigate('/login', { state: { redirectTo: '/scenes', noticeKey: 'unlockFeature' } })
   }, [isLoggedIn, navigate, lang])
 
   useEffect(() => {
