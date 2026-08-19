@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Cloud-synced user media (Part C). Owner-only — a signed-in user may only
+// read/write their own uid's prefix. No money involved (unlike the credits
+// ledger), so unlike Firestore's server-only users/orders/ledger rules, the
+// client SDK writes directly here.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

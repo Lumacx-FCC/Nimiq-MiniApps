@@ -558,7 +558,10 @@ export default function RoleplayStudio() {
 
   const flash = useCallback((text: string, isError = false) => {
     setNotice({ text, isError })
-    window.setTimeout(() => setNotice(null), 4200)
+    // Errors render as the ErrorNotice modal — dismiss on click only, so the
+    // user has time to actually read it instead of a timer clearing it early.
+    if (!isError)
+      window.setTimeout(() => setNotice(null), 4200)
   }, [])
 
   const resetUsage = useCallback(() => {

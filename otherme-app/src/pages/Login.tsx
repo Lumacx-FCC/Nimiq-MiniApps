@@ -2,7 +2,7 @@
  * Login — Nimiq wallet primary (one native dialog inside Nimiq Pay),
  * email/password fallback for browser demos. Mirrors core-modules LoginCard.
  */
-import { KeyRound, LogIn, Mail, Wallet } from 'lucide-react'
+import { KeyRound, Mail, Wallet } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
@@ -27,6 +27,9 @@ const COPY = {
     switchToLogIn: 'Already have an account? Log in',
     google: 'Continue with Google',
     accountScope: 'Credits and saved characters stay with the sign-in method you choose — a wallet balance won’t appear under an email login yet. Account linking is coming soon.',
+    forgotPassword: 'Forgot password?',
+    resetSent: 'If an account exists for that email, a reset link is on its way.',
+    resetNeedsEmail: 'Enter your email above first, then tap "Forgot password?"',
   },
   es: {
     title: 'Bienvenido a Other Me',
@@ -43,8 +46,23 @@ const COPY = {
     switchToLogIn: '¿Ya tienes cuenta? Inicia sesión',
     google: 'Continuar con Google',
     accountScope: 'Los créditos y personajes guardados quedan ligados al método que elijas — un saldo de wallet aún no aparece en un inicio de sesión por email. La vinculación de cuentas llegará pronto.',
+    forgotPassword: '¿Olvidaste tu contraseña?',
+    resetSent: 'Si existe una cuenta con ese email, un enlace para restablecerla está en camino.',
+    resetNeedsEmail: 'Escribe tu email arriba primero y luego toca "¿Olvidaste tu contraseña?"',
   },
 } as const
+
+/** Official Google "G" mark — per Google's sign-in button branding guidelines. */
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z" />
+    </svg>
+  )
+}
 
 export default function Login() {
   const { lang } = useSettings()
@@ -52,11 +70,12 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const state = (location.state || {}) as { notice?: string, redirectTo?: string }
-  const { isBusy, error, canUseNimiq, canUseGoogle, loginWithNimiq, loginWithGoogle, loginWithEmail, signUpWithEmail } = useAuth()
+  const { isBusy, error, canUseNimiq, canUseGoogle, loginWithNimiq, loginWithGoogle, loginWithEmail, signUpWithEmail, requestPasswordReset } = useAuth()
 
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [resetNotice, setResetNotice] = useState<string | null>(null)
 
   const finish = (ok: boolean) => {
     if (ok)
@@ -68,6 +87,17 @@ export default function Login() {
     if (!email || !password)
       return
     finish(mode === 'login' ? await loginWithEmail(email, password) : await signUpWithEmail(email, password))
+  }
+
+  const forgotPassword = async () => {
+    if (!email) {
+      setResetNotice(t.resetNeedsEmail)
+      return
+    }
+    // Always show the same notice regardless of whether the email exists —
+    // don't let this endpoint reveal which addresses have accounts.
+    requestPasswordReset(email).catch(() => {})
+    setResetNotice(t.resetSent)
   }
 
   return (
@@ -86,14 +116,20 @@ export default function Login() {
         <button className="om-button blue w-full" disabled={isBusy} onClick={async () => finish(await loginWithNimiq())}>
           <Wallet size={18} />
           {t.nimiq}
+          <img src="/nimiq-hexagon.svg" alt="" width={18} height={18} />
         </button>
         <p className="text-xs text-center mt-2" style={{ color: 'var(--text-40)' }}>
           {canUseNimiq() ? t.nimiqHint : t.outsidePay}
         </p>
 
         {canUseGoogle() && (
-          <button className="om-button secondary w-full mt-3" disabled={isBusy} onClick={async () => finish(await loginWithGoogle())}>
-            <LogIn size={18} />
+          <button
+            className="om-button w-full mt-3"
+            disabled={isBusy}
+            onClick={async () => finish(await loginWithGoogle())}
+            style={{ background: '#fff', color: '#3c4043', boxShadow: '0 1px 2px rgba(0,0,0,0.25)', border: '1px solid #dadce0' }}
+          >
+            <GoogleIcon />
             {t.google}
           </button>
         )}
@@ -135,6 +171,16 @@ export default function Login() {
           </button>
         </form>
 
+        {mode === 'login' && (
+          <button
+            className="block mx-auto mt-3 text-xs font-bold bg-transparent border-none cursor-pointer"
+            style={{ color: 'var(--text-40)' }}
+            onClick={forgotPassword}
+          >
+            {t.forgotPassword}
+          </button>
+        )}
+
         <button
           className="block mx-auto mt-4 text-sm font-bold bg-transparent border-none cursor-pointer"
           style={{ color: 'var(--nimiq-light-blue)' }}
@@ -143,6 +189,7 @@ export default function Login() {
           {mode === 'login' ? t.switchToSignUp : t.switchToLogIn}
         </button>
 
+        {resetNotice && <div className="nq-notice info mt-4" role="status">{resetNotice}</div>}
         {error && <div className="nq-notice error" role="alert">{error}</div>}
       </div>
     </div>

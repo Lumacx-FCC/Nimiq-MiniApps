@@ -17,7 +17,8 @@ import express, { type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
-import { handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
+import { handleLinkCommit, handleLinkRedeemPreview, handleLinkStart, handleUnlink } from "./account/routes.js";
+import { handleAccountResolve, handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
 import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
 import { runReconcile } from "./reconciler/reconcile.js";
@@ -489,6 +490,17 @@ router.post("/share", express.raw({ type: () => true, limit: "25mb" }), wrap(cre
 // Signed-challenge login (Nimiq Pay signs; server verifies). See auth/routes.ts.
 router.post("/auth/challenge", json, wrap(handleAuthChallenge));
 router.post("/auth/verify", json, wrap(handleAuthVerify));
+
+// Exchange a native email/Google Firebase ID token for a canonical session
+// token (Part A of account linking). See auth/routes.ts.
+router.post("/account/resolve", json, wrap(handleAccountResolve));
+
+// Account linking (Part B): pairing-code based, preview-before-commit. See
+// account/routes.ts.
+router.post("/account/link/start", json, wrap(handleLinkStart));
+router.post("/account/link/redeem-preview", json, wrap(handleLinkRedeemPreview));
+router.post("/account/link/commit", json, wrap(handleLinkCommit));
+router.post("/account/unlink", json, wrap(handleUnlink));
 
 // Server-authoritative credits ledger (Phase 2). All require a session token.
 router.get("/credits/balance", wrap(handleBalance));

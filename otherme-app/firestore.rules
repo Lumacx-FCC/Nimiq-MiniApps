@@ -16,6 +16,8 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Part B adds linkedUids/primaryProvider/mergedInto/mergedAt to this doc —
+    // same server-only-write shape, no rule change needed for new fields.
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow write: if false;
@@ -34,6 +36,38 @@ service cloud.firestore {
     // Login challenges are server-only; never exposed to the client SDK.
     match /auth_challenges/{address} {
       allow read, write: if false;
+    }
+
+    // Account-linking resolution (Part A/B): server-only, Admin SDK writes.
+    match /identity_links/{uid} {
+      allow read, write: if false;
+    }
+
+    // Pairing codes + short-lived merge-confirmation tickets (Part B):
+    // server-only, single-use, never exposed to the client SDK.
+    match /link_codes/{code} {
+      allow read, write: if false;
+    }
+    match /link_tickets/{ticketId} {
+      allow read, write: if false;
+    }
+
+    // Generic rate-limit counters (Part B onward): server-only.
+    match /rate_limits/{key} {
+      allow read, write: if false;
+    }
+
+    // Cloud-synced character sheets and custom avatars (Part C Stage 1).
+    // Client SDK writes directly (no money at stake, unlike the ledger above).
+    // create/update check the incoming doc's uid; read/delete check the
+    // existing doc's uid (request.resource is unset on a delete).
+    match /character_sheets/{sheetId} {
+      allow read, delete: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+    match /avatars/{avatarId} {
+      allow read, delete: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.uid;
     }
   }
 }
