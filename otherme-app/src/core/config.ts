@@ -3,24 +3,20 @@
  * Import once (main.tsx) before anything touches auth/credits.
  */
 import { configure } from '@core/config'
+// Single source of truth for treasuries/prices/bonus, shared with the server
+// (functions/src/config.ts imports the same file) — see its own header comment.
+import { EVM_TREASURY_ADDRESS, NIM_BONUS_MULTIPLIER, NIM_TREASURY_ADDRESS, PACKS } from '../../functions/src/sharedPricing'
 
 configure({
   appId: 'otherme',
   appName: 'Other Me',
-  // Team test treasury accounts (same as core-modules demo). Replace for production.
-  nimTreasuryAddress: 'NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F',
-  evmTreasuryAddress: '0xdA5727CEb6bc093f22F6d56b75F5B3773Fbdf4D1',
-  // PRODUCTION PRICES (live since 2026-07-27). `usd` is what we actually charge:
-  // the early-bird price, 25% off the regular rate until Nov 1st 2026. Regular
-  // prices live in REGULAR_USD below (shown struck through on the Credits page).
-  // After Nov 1st: set these to the REGULAR_USD values and drop the banner.
-  // KEEP IN SYNC with functions/src/config.ts PACKS — the server is authoritative.
-  packs: [
-    { usd: 0.75, credits: 30 },
-    { usd: 3.75, credits: 200 },
-    { usd: 15.00, credits: 1000 },
-  ],
-  nimBonusMultiplier: 1.5,
+  nimTreasuryAddress: NIM_TREASURY_ADDRESS,
+  evmTreasuryAddress: EVM_TREASURY_ADDRESS,
+  // Regular (pre-discount) prices live in REGULAR_USD below (shown struck
+  // through on the Credits page) — after Nov 1st 2026, set PACKS in
+  // sharedPricing.ts to the REGULAR_USD values and drop the banner.
+  packs: [...PACKS],
+  nimBonusMultiplier: NIM_BONUS_MULTIPLIER,
   creditHighlights: [
     '1 minute talking = 1 credit',
     '1 talking avatar = 3 credits',

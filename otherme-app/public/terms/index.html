@@ -208,7 +208,7 @@ footer p{margin:0 0 9px}
 <div class="glance">
   <dl>
     <dt data-lang="en">Last updated</dt><dt data-lang="es" hidden>Última actualización</dt>
-    <dd data-lang="en">28 July 2026</dd><dd data-lang="es" hidden>28 de julio de 2026</dd>
+    <dd data-lang="en">19 August 2026</dd><dd data-lang="es" hidden>19 de agosto de 2026</dd>
     <dt data-lang="en">Operator</dt><dt data-lang="es" hidden>Operador</dt>
     <dd data-lang="en">Other Me Labs — part of Studio Swai, San José, Costa Rica</dd>
     <dd data-lang="es" hidden>Other Me Labs — parte de Studio Swai, San José, Costa Rica</dd>
@@ -284,53 +284,55 @@ footer p{margin:0 0 9px}
   <div data-lang="en">
     <div class="callout warn">
       <h3>Read this before buying credits</h3>
-      <p>Other Me currently keeps a separate account for each sign-in method. Your
-      identity is the Nimiq wallet address you connect with, or the email address
-      you register with — they are <strong>not</strong> the same account, and they
-      are <strong>not</strong> linked.</p>
+      <p>By default, Other Me keeps a separate account for each sign-in method:
+      a Nimiq wallet address, an email address, and a Google account each start
+      as their own account with their own balance and saved characters.</p>
     </div>
-    <p>Consequences you should expect:</p>
+    <p>You can combine two of these into one shared account from your
+    <strong>Profile page</strong>:</p>
     <ul>
-      <li>Credits bought with a Nimiq wallet inside Nimiq Pay belong to
-      <strong>that wallet address</strong>. Signing in later by email — in a desktop
-      browser, for example — gives you a <strong>different account with a different
-      balance</strong>, and your purchased credits will not appear there.</li>
-      <li>Email registration is currently stored <strong>on the device you
-      registered on</strong>. An email account created on your phone does not exist
-      on your desktop; you would have to register again there, creating yet another
-      separate account.</li>
-      <li>Credits are not transferable between accounts, and we cannot merge
-      accounts on request at this time.</li>
+      <li>Generate a short pairing code on the account you want to keep, and
+      redeem it from the other one — you see a preview of the combined
+      balance before anything is confirmed.</li>
+      <li><strong>Linking merges balances permanently</strong> into whichever
+      account initiated the link. We cannot reverse a completed merge, so
+      review the preview carefully first.</li>
+      <li>Email and Google accounts are real accounts tied to your login, not
+      to a device — signing in with the same email or Google account
+      elsewhere gives you the same balance and saved characters, with or
+      without linking.</li>
     </ul>
-    <p>If you want your credits available on desktop, use the same Nimiq wallet
-    address you purchased with. Account linking is planned but not available yet;
-    until it ships, treat each sign-in method as a separate account.</p>
+    <p>Until you link two accounts, treat each sign-in method as separate:
+    credits and saved characters from one won't appear under another. If you
+    want one balance across a wallet and an email or Google login, link them
+    from your Profile page.</p>
   </div>
   <div data-lang="es" hidden>
     <div class="callout warn">
       <h3>Lee esto antes de comprar créditos</h3>
-      <p>Other Me actualmente mantiene una cuenta separada para cada método de inicio
-      de sesión. Tu identidad es la dirección de wallet Nimiq con la que te conectas,
-      o el correo con el que te registras — <strong>no</strong> son la misma cuenta,
-      y <strong>no</strong> están vinculadas.</p>
+      <p>Por defecto, Other Me mantiene una cuenta separada para cada método
+      de inicio de sesión: una dirección de wallet Nimiq, un correo y una
+      cuenta de Google, cada uno inicia como su propia cuenta con su propio
+      saldo y personajes guardados.</p>
     </div>
-    <p>Consecuencias que debes esperar:</p>
+    <p>Puedes combinar dos de estas en una sola cuenta compartida desde tu
+    <strong>página de perfil</strong>:</p>
     <ul>
-      <li>Los créditos comprados con una wallet Nimiq dentro de Nimiq Pay pertenecen
-      a <strong>esa dirección de wallet</strong>. Iniciar sesión después por email —
-      en un navegador de escritorio, por ejemplo — te da una <strong>cuenta diferente
-      con un saldo diferente</strong>, y tus créditos comprados no aparecerán ahí.</li>
-      <li>El registro por email actualmente se guarda <strong>en el dispositivo donde
-      te registraste</strong>. Una cuenta de email creada en tu teléfono no existe en
-      tu computadora; tendrías que registrarte de nuevo ahí, creando otra cuenta
-      separada más.</li>
-      <li>Los créditos no son transferibles entre cuentas, y no podemos fusionar
-      cuentas a solicitud por el momento.</li>
+      <li>Genera un código de vinculación corto en la cuenta que quieres
+      conservar, y canjéalo desde la otra — verás una vista previa del saldo
+      combinado antes de confirmar nada.</li>
+      <li><strong>Vincular fusiona los saldos de forma permanente</strong> en
+      la cuenta que inició la vinculación. No podemos revertir una fusión ya
+      completada, así que revisa la vista previa con cuidado primero.</li>
+      <li>Las cuentas de email y Google son cuentas reales ligadas a tu
+      inicio de sesión, no a un dispositivo — iniciar sesión con el mismo
+      correo o cuenta de Google en otro lugar te da el mismo saldo y los
+      mismos personajes guardados, con o sin vinculación.</li>
     </ul>
-    <p>Si quieres que tus créditos estén disponibles en escritorio, usa la misma
-    dirección de wallet Nimiq con la que compraste. La vinculación de cuentas está
-    planeada pero aún no disponible; hasta que esté lista, trata cada método de
-    inicio de sesión como una cuenta separada.</p>
+    <p>Hasta que vincules dos cuentas, trata cada método de inicio de sesión
+    como separado: los créditos y personajes guardados de uno no aparecerán
+    en otro. Si quieres un solo saldo entre una wallet y un correo o cuenta
+    de Google, vincúlalos desde tu página de perfil.</p>
   </div>
 </section>
 
@@ -493,10 +495,10 @@ footer p{margin:0 0 9px}
   <table>
     <thead><tr><th>What</th><th>Where it is stored</th><th>Who can see it</th></tr></thead>
     <tbody>
-      <tr><td>Character sheets, custom avatars</td><td><strong>Your device</strong> (browser localStorage)</td><td>You</td></tr>
+      <tr><td>Character sheets, custom avatars</td><td><strong>Your device</strong> (browser localStorage), <strong>and</strong> our server (Firebase/Firestore + Storage) once you're signed in — local storage stays as an offline cache</td><td>You, us</td></tr>
       <tr><td>Scenes and video clips</td><td><strong>Your device</strong> (browser IndexedDB)</td><td>You</td></tr>
       <tr><td>Conversations with your character</td><td><strong>Nowhere.</strong> Held in memory only, for the duration of the session</td><td>You, plus Google while the session is live (section 7)</td></tr>
-      <tr><td>Credit balance and purchase history</td><td>Your device, <strong>and</strong> our server when you sign in with a Nimiq wallet</td><td>You, us</td></tr>
+      <tr><td>Credit balance and purchase history</td><td>Your device, <strong>and</strong> our server once you're signed in (any sign-in method)</td><td>You, us</td></tr>
       <tr><td>Wallet address, transaction hashes, amounts, credits granted</td><td><strong>Our server</strong> (Firebase/Firestore)</td><td>You, us</td></tr>
       <tr><td>Images sent for generation or analysis</td><td><strong>Not retained by us.</strong> Passed through to the AI provider and discarded</td><td>Our AI providers (section 10)</td></tr>
       <tr><td>Files you create a share link for</td><td><strong>Our server</strong> (Firebase Storage), at a public URL (section 8)</td><td>Anyone with the link</td></tr>
@@ -507,22 +509,26 @@ footer p{margin:0 0 9px}
   <table>
     <thead><tr><th>Qué</th><th>Dónde se almacena</th><th>Quién puede verlo</th></tr></thead>
     <tbody>
-      <tr><td>Fichas de personaje, avatares personalizados</td><td><strong>Tu dispositivo</strong> (localStorage del navegador)</td><td>Tú</td></tr>
+      <tr><td>Fichas de personaje, avatares personalizados</td><td><strong>Tu dispositivo</strong> (localStorage del navegador), <strong>y</strong> nuestro servidor (Firebase/Firestore + Storage) una vez que inicias sesión — el almacenamiento local queda como caché sin conexión</td><td>Tú, nosotros</td></tr>
       <tr><td>Escenas y clips de video</td><td><strong>Tu dispositivo</strong> (IndexedDB del navegador)</td><td>Tú</td></tr>
       <tr><td>Conversaciones con tu personaje</td><td><strong>En ningún lugar.</strong> Se mantienen solo en memoria, durante la sesión</td><td>Tú, más Google mientras la sesión está activa (sección 7)</td></tr>
-      <tr><td>Saldo de créditos e historial de compras</td><td>Tu dispositivo, <strong>y</strong> nuestro servidor cuando inicias sesión con una wallet Nimiq</td><td>Tú, nosotros</td></tr>
+      <tr><td>Saldo de créditos e historial de compras</td><td>Tu dispositivo, <strong>y</strong> nuestro servidor una vez que inicias sesión (cualquier método)</td><td>Tú, nosotros</td></tr>
       <tr><td>Dirección de wallet, hashes de transacción, montos, créditos otorgados</td><td><strong>Nuestro servidor</strong> (Firebase/Firestore)</td><td>Tú, nosotros</td></tr>
       <tr><td>Imágenes enviadas para generación o análisis</td><td><strong>No las conservamos.</strong> Se envían al proveedor de IA y se descartan</td><td>Nuestros proveedores de IA (sección 10)</td></tr>
       <tr><td>Archivos para los que creas un enlace para compartir</td><td><strong>Nuestro servidor</strong> (Firebase Storage), en una URL pública (sección 8)</td><td>Cualquiera con el enlace</td></tr>
     </tbody>
   </table>
   </div>
-  <p data-lang="en">We do not sell your data. We do not run advertising. We do not store your
-  uploaded images or your generated assets on our servers except where you
-  explicitly create a share link.</p>
-  <p data-lang="es" hidden>No vendemos tus datos. No mostramos publicidad. No almacenamos las
-  imágenes que subes ni el contenido que generas en nuestros servidores, excepto
-  cuando creas explícitamente un enlace para compartir.</p>
+  <p data-lang="en">We do not sell your data. We do not run advertising. Uploaded images
+  are never stored on our servers — they are passed to the AI provider and
+  discarded. Character sheets, avatars, and files you explicitly share are
+  stored on our servers only once you are signed in, or when you create a
+  share link.</p>
+  <p data-lang="es" hidden>No vendemos tus datos. No mostramos publicidad. Las imágenes que
+  subes nunca se almacenan en nuestros servidores — se envían al proveedor de
+  IA y se descartan. Las fichas de personaje, avatares y archivos que
+  compartes explícitamente se almacenan en nuestros servidores solo cuando
+  inicias sesión, o cuando creas un enlace para compartir.</p>
 </section>
 
 <section id="s7">
@@ -617,8 +623,8 @@ footer p{margin:0 0 9px}
   <h2 data-lang="es" hidden><span class="num">9.</span>Tú eres responsable de tus propias copias de seguridad</h2>
   <div data-lang="en">
     <p>This is the most important practical warning in this document.</p>
-    <p>Because your characters, scenes, and clips are stored <strong>in your
-    browser</strong>, they are permanently lost if you:</p>
+    <p>Scenes and video clips are still stored only <strong>in your
+    browser</strong> (IndexedDB) and are permanently lost if you:</p>
     <ul>
       <li>clear your browser data, site data, or cache;</li>
       <li>use private/incognito browsing;</li>
@@ -626,22 +632,26 @@ footer p{margin:0 0 9px}
       <li>run out of device storage while saving; or</li>
       <li>switch to a different device or browser.</li>
     </ul>
-    <p>The same applies to the credit balance of an <strong>email-registered</strong>
-    account, which exists only on that device. A credit balance attached to a
-    <strong>Nimiq wallet address</strong> is held on our server as well and survives
-    losing the device, provided you sign in with the same wallet.</p>
+    <p><strong>Character sheets and custom avatars are different once you're
+    signed in:</strong> they sync to our server, so losing the device or
+    clearing browser data no longer loses them — they reappear automatically
+    the next time you sign in. If you're not signed in, they follow the same
+    local-only warning as scenes and clips above.</p>
+    <p>Credit balances are server-side for every sign-in method once you're
+    signed in, and survive losing the device — provided you sign back in with
+    the same account, or one linked to it (section 2).</p>
     <div class="callout warn">
-      <p><strong>Export anything you want to keep.</strong> We cannot recover lost
-      local data — we never had a copy of it.</p>
+      <p><strong>Export anything you want to keep that isn't cloud-synced</strong>
+      (scenes, video clips, or anything created while signed out). We cannot
+      recover lost local data — we never had a copy of it.</p>
     </div>
-    <p>Browser storage is also finite (roughly a few megabytes for characters). The
-    app warns you when a save fails. If you ignore that warning, the item is not
-    saved.</p>
+    <p>Browser storage is also finite (roughly a few megabytes). The app warns
+    you when a save fails. If you ignore that warning, the item is not saved.</p>
   </div>
   <div data-lang="es" hidden>
     <p>Esta es la advertencia práctica más importante de este documento.</p>
-    <p>Como tus personajes, escenas y clips se almacenan <strong>en tu
-    navegador</strong>, se pierden permanentemente si:</p>
+    <p>Las escenas y los clips de video todavía se almacenan solo <strong>en tu
+    navegador</strong> (IndexedDB) y se pierden permanentemente si:</p>
     <ul>
       <li>borras los datos de tu navegador, los datos del sitio o la caché;</li>
       <li>usas navegación privada/incógnito;</li>
@@ -650,18 +660,25 @@ footer p{margin:0 0 9px}
       guarda; o</li>
       <li>cambias a un dispositivo o navegador diferente.</li>
     </ul>
-    <p>Lo mismo aplica al saldo de créditos de una cuenta <strong>registrada por
-    email</strong>, que existe solo en ese dispositivo. Un saldo de créditos
-    vinculado a una <strong>dirección de wallet Nimiq</strong> también se guarda
-    en nuestro servidor y sobrevive a la pérdida del dispositivo, siempre que
-    inicies sesión con la misma wallet.</p>
+    <p><strong>Las fichas de personaje y los avatares personalizados son
+    diferentes una vez que inicias sesión:</strong> se sincronizan con
+    nuestro servidor, así que perder el dispositivo o borrar los datos del
+    navegador ya no los pierde — reaparecen automáticamente la próxima vez
+    que inicias sesión. Si no has iniciado sesión, siguen la misma
+    advertencia de almacenamiento local que las escenas y clips de arriba.</p>
+    <p>Los saldos de créditos son del lado del servidor para cualquier
+    método de inicio de sesión una vez que inicias sesión, y sobreviven a la
+    pérdida del dispositivo — siempre que vuelvas a iniciar sesión con la
+    misma cuenta, o una vinculada a ella (sección 2).</p>
     <div class="callout warn">
-      <p><strong>Exporta todo lo que quieras conservar.</strong> No podemos
-      recuperar datos locales perdidos — nunca tuvimos una copia de ellos.</p>
+      <p><strong>Exporta todo lo que quieras conservar que no esté
+      sincronizado en la nube</strong> (escenas, clips de video, o cualquier
+      cosa creada sin haber iniciado sesión). No podemos recuperar datos
+      locales perdidos — nunca tuvimos una copia de ellos.</p>
     </div>
-    <p>El almacenamiento del navegador también es finito (aproximadamente unos
-    pocos megabytes para personajes). La app te avisa cuando falla un guardado.
-    Si ignoras ese aviso, el elemento no se guarda.</p>
+    <p>El almacenamiento del navegador también es finito (aproximadamente
+    unos pocos megabytes). La app te avisa cuando falla un guardado. Si
+    ignoras ese aviso, el elemento no se guarda.</p>
   </div>
 </section>
 
@@ -805,10 +822,10 @@ footer p{margin:0 0 9px}
 </section>
 
 <footer>
-  <p data-lang="en"><strong>Last updated:</strong> 28 July 2026 · Operator: Other Me Labs —
+  <p data-lang="en"><strong>Last updated:</strong> 19 August 2026 · Operator: Other Me Labs —
   part of Studio Swai, San José, Costa Rica ·
   <a href="mailto:info@othermeapp.com">info@othermeapp.com</a></p>
-  <p data-lang="es" hidden><strong>Última actualización:</strong> 28 de julio de 2026 ·
+  <p data-lang="es" hidden><strong>Última actualización:</strong> 19 de agosto de 2026 ·
   Operador: Other Me Labs — parte de Studio Swai, San José, Costa Rica ·
   <a href="mailto:info@othermeapp.com">info@othermeapp.com</a></p>
   <p><a href="/">othermeapp.com</a></p>

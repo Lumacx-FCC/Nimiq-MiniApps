@@ -76,6 +76,14 @@ across throwaway accounts. Unlink requires a fresh re-authentication
 (`requireFreshUid`, Firebase's `auth_time` within 5 minutes) and revokes both
 sides' refresh tokens.
 
+**Bug fixed 19 Aug 2026, confirmed working:** linking merged balances
+server-side, but re-logging in with the wallet that got folded away didn't
+actually land you back on the shared account — only the email/Google re-login
+path resolved through `identity_links`, the wallet's challenge/verify didn't.
+Fixed in all three places that needed it (server + both client login paths);
+balances and cloud-synced character sheets are now correctly shared across
+linked accounts either way you sign in.
+
 Deferred by design, not forgotten: reversing a balance merge (one-way,
 support-assisted if it ever comes up), and self-service recovery when the
 canonical factor is lost and nothing was ever linked.
@@ -176,5 +184,7 @@ email/Google, account linking (item 1), cloud sync for character sheets +
 avatars (item 4, Stage 1), a Spanish translation + EN/ES toggle for `/terms`
 (item 7), an admin-gated credit-grant endpoint + `/promos_management` page for
 contest/promo payouts, a UID-with-copy row on `/profile`, pinning
-`@nimiq/mini-app-sdk`, fixing the language-frozen login redirect notices, and
-persisting the mic error to `sessionStorage` so `audio-check.html` can read it.
+`@nimiq/mini-app-sdk`, fixing the language-frozen login redirect notices,
+persisting the mic error to `sessionStorage` so `audio-check.html` can read
+it, and fixing linked accounts not actually sharing a session on wallet
+re-login (item 1's real-world completion).

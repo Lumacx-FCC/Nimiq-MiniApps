@@ -8,16 +8,9 @@
  */
 import type { Request, Response } from "express";
 import { getAuth } from "firebase-admin/auth";
+import { isNimiqAddress, normalizeAddress } from "../shared/nimiqAddress.js";
 import { verifyNimiqSignature } from "./nimiqSignature.js";
 import { ensureAccountUser, ensureUser, issueChallenge, mintSessionToken, resolveCanonicalUid, takeChallenge } from "./store.js";
-
-function normalizeAddress(addr: string): string {
-  return addr.replace(/\s+/g, "").toUpperCase();
-}
-
-function isNimiqAddress(addr: string): boolean {
-  return /^NQ[0-9A-Z]{34}$/.test(addr);
-}
 
 export async function handleAuthChallenge(req: Request, res: Response): Promise<void> {
   const address = normalizeAddress(String(req.body?.address || ""));
