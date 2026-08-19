@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
 import { AccountOverview, LinkedAccount, PreviewLinkResult, commitLink, getAccountOverview, previewLink, startLink, unlinkSecondary } from '../core/accountLink'
-import { onSessionChange } from '../core/session'
+import { getCurrentUid, onSessionChange } from '../core/session'
 import AppHeader from '../components/AppHeader'
 import CollapsibleCard from '../components/CollapsibleCard'
 import ErrorNotice from '../components/ErrorNotice'
@@ -226,10 +226,15 @@ export default function Profile() {
 
   const minutesLeft = (expiresAt: number) => Math.max(0, Math.ceil((expiresAt - Date.now()) / 60000))
 
+  // Prefer the LIVE Firebase session uid over the cached AuthUser.id — the
+  // cached value can briefly lag the canonical uid right after a wallet
+  // login that resolved through an existing link (see core/auth.ts).
+  const displayUid = getCurrentUid() ?? user?.id
+
   const copyUid = () => {
-    if (!user?.id)
+    if (!displayUid)
       return
-    navigator.clipboard.writeText(user.id).then(() => {
+    navigator.clipboard.writeText(displayUid).then(() => {
       setUidCopied(true)
       window.setTimeout(() => setUidCopied(false), 1500)
     })
@@ -248,7 +253,7 @@ export default function Profile() {
         </p>
         <p className="text-xs" style={{ color: 'var(--text-40)' }}>{t.signedInAs}: {user?.label}</p>
         <div className="flex items-center justify-center gap-1.5 mt-1">
-          <p className="text-xs" style={{ color: 'var(--text-40)' }}>{t.uid}: {user?.id}</p>
+          <p className="text-xs" style={{ color: 'var(--text-40)' }}>{t.uid}: {displayUid}</p>
           <button
             className="icon-chip"
             style={{ minHeight: 0, minWidth: 0, padding: 5 }}

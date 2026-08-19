@@ -83,7 +83,25 @@ export const auth = {
     // (or an undeployed server) must not undo it. Server becomes authoritative
     // for the credits ledger in a later phase.
     if (ok) {
-      establishServerSession().catch((e) => {
+      establishServerSession().then((canonicalUid) => {
+        // If this wallet was linked into another account, the server session
+        // resolves to the shared canonical uid, not the wallet address we just
+        // logged in with locally — swap local identity to match so the
+        // credits balance (keyed off the session uid) and any UID displayed
+        // to the user (e.g. Profile) refer to the same account.
+        const current = authStore.get().user
+        if (current && current.provider === 'nimiq' && current.id !== canonicalUid) {
+          const merged: AuthUser = {
+            ...current,
+            id: canonicalUid,
+            label: `${canonicalUid.slice(0, 9)}…${canonicalUid.slice(-4)}`,
+            nimiqAddress: canonicalUid,
+          }
+          persist(merged)
+          authStore.update(s => ({ ...s, user: merged }))
+          loadCreditsFor(canonicalUid)
+        }
+      }).catch((e) => {
         console.warn('[session] server session not established:', e instanceof Error ? e.message : e)
       })
     }
