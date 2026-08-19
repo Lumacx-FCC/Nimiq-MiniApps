@@ -52,8 +52,26 @@ async function finishLogin(user: User, provider: 'email' | 'google'): Promise<Au
     // the native Firebase sign-in already succeeded and is itself a real,
     // verifiable session — a failed canonical-session swap shouldn't undo it.
     console.warn('[auth] server session resolve failed:', e instanceof Error ? e.message : e)
+    return toAuthUser(user, provider)
   }
-  return toAuthUser(user, provider)
+  // resolveServerSession may have swapped onto a different (canonical) uid if
+  // this account was linked into another — read the ACTUAL post-swap session
+  // instead of the native `user` captured before the swap, so the credits
+  // balance (keyed off the session uid) and any UID shown to the user (e.g.
+  // Profile) refer to the account the server actually granted. Same
+  // provider-derivation shape as accountLink.ts's commitLink().
+  const canonical = getFirebaseAuth().currentUser
+  if (!canonical)
+    return toAuthUser(user, provider)
+  const isGoogle = canonical.providerData.some(p => p.providerId === 'google.com')
+  const canonicalProvider = isGoogle ? 'google' : canonical.email ? 'email' : 'nimiq'
+  return {
+    provider: canonicalProvider,
+    id: canonical.uid,
+    label: canonical.email ?? canonical.uid,
+    email: canonical.email ?? undefined,
+    nimiqAddress: canonicalProvider === 'nimiq' ? canonical.uid : undefined,
+  }
 }
 
 export async function signUpWithEmail(email: string, password: string): Promise<AuthUser> {

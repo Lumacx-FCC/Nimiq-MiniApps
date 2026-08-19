@@ -55,8 +55,13 @@ export async function handleAuthVerify(req: Request, res: Response): Promise<voi
   }
 
   await ensureUser(address);
-  const token = await mintSessionToken(address);
-  res.status(200).json({ token, address });
+  // Resolve through identity_links so a wallet folded into another account via
+  // linking signs back in AS the shared canonical account, not its own
+  // now-empty one — mirrors handleAccountResolve below. No-op for an
+  // never-linked wallet (resolveCanonicalUid returns the same address).
+  const canonicalUid = await resolveCanonicalUid(address);
+  const token = await mintSessionToken(canonicalUid);
+  res.status(200).json({ token, address: canonicalUid });
 }
 
 /**

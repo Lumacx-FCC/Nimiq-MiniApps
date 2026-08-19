@@ -34,7 +34,11 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 /**
  * Prove ownership of the connected Nimiq address and sign in to Firebase.
- * Returns the verified address on success. Throws with a user-facing message.
+ * Returns the RESULTING session's uid — which is the canonical uid, not
+ * necessarily the wallet address signed in with, if this wallet was linked
+ * into another account (server resolves through identity_links before
+ * minting the token). The caller must reconcile local identity against this,
+ * not assume it equals the wallet address. Throws with a user-facing message.
  */
 export async function establishServerSession(): Promise<string> {
   const nimiq = await getNimiq()
@@ -65,7 +69,7 @@ export async function establishServerSession(): Promise<string> {
 
   // 4. Exchange for a Firebase session.
   await signInWithCustomToken(getFirebaseAuth(), token)
-  return address
+  return getFirebaseAuth().currentUser?.uid ?? address
 }
 
 /**
