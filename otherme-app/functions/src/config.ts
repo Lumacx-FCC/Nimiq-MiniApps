@@ -2,14 +2,15 @@
  * Server-authoritative payment config (Phase 3+). The server — not the client —
  * decides prices, treasuries, and the amount owed for an order.
  *
- * KEEP IN SYNC with otherme-app/src/core/config.ts (packs, treasuries, bonus).
- * PACKS below are live production prices. NIM_TREASURY_ADDRESS/EVM_TREASURY_ADDRESS
- * are still the shared test pair — replace before real purchases should count as revenue.
+ * Treasuries, prices, and the NIM bonus now live in `sharedPricing.ts`, the
+ * single source both this file and the client's `src/core/config.ts` import —
+ * no more hand-copying two files in sync. NIM_TREASURY_ADDRESS/
+ * EVM_TREASURY_ADDRESS are still the shared test pair — replace before real
+ * purchases should count as revenue.
  */
-export const NIM_TREASURY_ADDRESS = "NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F";
-export const EVM_TREASURY_ADDRESS = "0xdA5727CEb6bc093f22F6d56b75F5B3773Fbdf4D1";
+export { EVM_TREASURY_ADDRESS, NIM_BONUS_MULTIPLIER, NIM_TREASURY_ADDRESS, PACKS } from "./sharedPricing.js";
+import { PACKS } from "./sharedPricing.js";
 
-export const NIM_BONUS_MULTIPLIER = 1.5;
 export const NIM_USD_FALLBACK_RATE = 0.005;
 export const LUNA_PER_NIM = 100_000;
 export const USDT_DECIMALS = 6;
@@ -51,17 +52,6 @@ export const RECONCILE_BATCH = 25;
 
 /** App id used in the NIM transaction data tag (`<appId>:<orderId>`). */
 export const APP_ID = "otherme";
-
-/**
- * Production credit packs (live since 2026-07-27). `usd` is what we charge: the
- * early-bird price, 25% off the regular $1 / $5 / $20 until Nov 1st 2026.
- * Keep in sync with the client config; this copy is the authoritative one.
- */
-export const PACKS = [
-  { usd: 0.75, credits: 30 },
-  { usd: 3.75, credits: 200 },
-  { usd: 15.00, credits: 1000 },
-] as const;
 
 export function findPack(usd: number): { usd: number; credits: number } | null {
   return PACKS.find(p => Math.abs(p.usd - usd) < 1e-9) ?? null;
