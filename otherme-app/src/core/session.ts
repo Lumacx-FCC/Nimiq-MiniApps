@@ -14,6 +14,7 @@
  * server session authoritative for the credits ledger. `getSessionToken()`
  * returns a fresh Firebase ID token to attach to /api/* calls when present.
  */
+import type { User } from 'firebase/auth'
 import { getNimiq } from '@core/auth/nimiqAuth'
 import { onAuthStateChanged, signInWithCustomToken, signOut } from 'firebase/auth'
 import { serverUrl } from './api'
@@ -67,6 +68,25 @@ export async function establishServerSession(): Promise<string> {
   return address
 }
 
+/**
+ * Part A of account linking: exchange a freshly-signed-in native Firebase user
+ * (email/Google) for the canonical session — swaps the native session for the
+ * one minted by /api/account/resolve, guaranteeing a `users/{uid}` profile
+ * exists. Pre-Part-B, canonical uid always equals the native uid; this just
+ * makes the swap forward-compatible with linking once it ships.
+ */
+export async function resolveServerSession(user: User): Promise<void> {
+  const idToken = await user.getIdToken()
+  const res = await fetch(serverUrl('/api/account/resolve'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  const data = await res.json().catch(() => ({})) as any
+  if (!res.ok)
+    throw new Error(data?.error || `Request failed (${res.status})`)
+  await signInWithCustomToken(getFirebaseAuth(), data.token)
+}
+
 /** Current Firebase ID token (auto-refreshed), or null if no server session. */
 export async function getSessionToken(): Promise<string | null> {
   const user = getFirebaseAuth().currentUser
@@ -85,6 +105,11 @@ export function onSessionChange(cb: (address: string | null) => void): () => voi
 /** True when a verified server session is active. */
 export function hasServerSession(): boolean {
   return getFirebaseAuth().currentUser !== null
+}
+
+/** The current session's uid (canonical uid, post-resolve), or null. */
+export function getCurrentUid(): string | null {
+  return getFirebaseAuth().currentUser?.uid ?? null
 }
 
 export async function clearServerSession(): Promise<void> {

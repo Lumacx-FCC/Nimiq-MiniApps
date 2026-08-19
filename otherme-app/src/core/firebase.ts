@@ -12,9 +12,11 @@
 import type { FirebaseApp } from 'firebase/app'
 import type { Auth } from 'firebase/auth'
 import type { Firestore } from 'firebase/firestore'
+import type { FirebaseStorage } from 'firebase/storage'
 import { getApp, getApps, initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBt2IHPk7eom8KOTcyH8kE65_HgnoQabug',
@@ -29,6 +31,7 @@ const firebaseConfig = {
 let app: FirebaseApp | null = null
 let authInstance: Auth | null = null
 let dbInstance: Firestore | null = null
+let storageInstance: FirebaseStorage | null = null
 
 export function getFirebaseApp(): FirebaseApp {
   app ??= getApps().length ? getApp() : initializeApp(firebaseConfig)
@@ -47,4 +50,10 @@ export function getFirebaseAuth(): Auth {
 export function getFirebaseDb(): Firestore {
   dbInstance ??= getFirestore(getFirebaseApp())
   return dbInstance
+}
+
+/** Firebase Storage client for cloud-synced user media (Part C). */
+export function getFirebaseStorage(): FirebaseStorage {
+  storageInstance ??= getStorage(getFirebaseApp())
+  return storageInstance
 }

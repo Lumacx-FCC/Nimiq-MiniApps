@@ -40,6 +40,14 @@ export const REGULAR_USD: Record<number, number> = {
   15: 20,
 }
 
+/**
+ * Show the "Continue with Google" button. Real Firebase-backed Google sign-in
+ * (see core/authProviders.ts). Confirmed 2026-08-18: Google sign-in enabled
+ * in the Firebase console for otherme-18f5b with an auto-generated Web SDK
+ * client (239756970799-...), so the button is live.
+ */
+export const GOOGLE_LOGIN_ENABLED = true
+
 /** One-time starter balance granted the first time an account's ledger is created. */
 export const WELCOME_CREDITS = 5
 export const FREE_SHEET_GENERATIONS = 5

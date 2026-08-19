@@ -1,21 +1,33 @@
 /**
- * Saved character sheets — localStorage for the hackathon.
- * Post-hackathon migration seam: swap these four functions for Firebase
- * (Firestore doc per sheet, Storage for the image) without touching the UI.
+ * Saved character sheets — localStorage as a read-through cache, Firestore +
+ * Storage as the cloud source of trute once a server session exists (Part C
+ * Stage 1). listSheets/saveSheet/deleteSheet stay synchronous and keep working
+ * exactly as before for every caller — cloud reads/writes happen in the
+ * background (fire-and-forget on save/delete; reconcileSheetsWithCloud() pulls
+ * cloud state into the local cache and pushes up any local-only sheets, called
+ * once per login from core/auth.ts). Logged-out / no session = today's
+ * local-only behavior, unchanged.
  */
 import type { CharacterSheet } from './fields'
+import { collection, deleteDoc, doc, getDocs, orderBy, query, setDoc, where } from 'firebase/firestore'
+import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage'
 import { apiUrl } from '../core/api'
+import { getFirebaseDb, getFirebaseStorage } from '../core/firebase'
+import { getCurrentUid, hasServerSession } from '../core/session'
 
 export interface SavedSheet {
   id: string
   name: string
   savedAt: string
   data: CharacterSheet
+  /** A local data: URL, or (once synced) a Storage download URL — both are
+   * valid <img src> values, so callers never need to branch on which. */
   imageDataUrl: string | null
 }
 
 const KEY = 'otherme:sheets'
 const MAX_SHEETS = 12
+const SHEETS_COLLECTION = 'character_sheets'
 
 export function listSheets(): SavedSheet[] {
   try {
@@ -28,25 +40,93 @@ export function listSheets(): SavedSheet[] {
 
 export function saveSheet(sheet: SavedSheet): boolean {
   const next = [sheet, ...listSheets().filter(item => item.id !== sheet.id)].slice(0, MAX_SHEETS)
+  let ok: boolean
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
-    return true
+    ok = true
   }
   catch {
     // Quota exceeded (images are heavy) — retry without the oldest images.
     try {
       const slim = next.map((item, index) => index > 2 ? { ...item, imageDataUrl: null } : item)
       localStorage.setItem(KEY, JSON.stringify(slim))
-      return true
+      ok = true
     }
     catch {
-      return false
+      ok = false
     }
   }
+  if (ok)
+    void uploadSheetIfSignedIn(sheet)
+  return ok
 }
 
 export function deleteSheet(id: string): void {
   localStorage.setItem(KEY, JSON.stringify(listSheets().filter(item => item.id !== id)))
+  const uid = hasServerSession() ? getCurrentUid() : null
+  if (uid) {
+    Promise.allSettled([
+      deleteDoc(doc(getFirebaseDb(), SHEETS_COLLECTION, id)),
+      deleteObject(ref(getFirebaseStorage(), `users/${uid}/sheets/${id}.webp`)),
+    ]).catch(() => {})
+  }
+}
+
+async function uploadSheetIfSignedIn(sheet: SavedSheet): Promise<void> {
+  const uid = hasServerSession() ? getCurrentUid() : null
+  if (!uid)
+    return
+  try {
+    await uploadSheetToCloud(uid, sheet)
+  }
+  catch (e) {
+    console.warn('[library] cloud sheet upload failed:', e instanceof Error ? e.message : e)
+  }
+}
+
+async function uploadSheetToCloud(uid: string, sheet: SavedSheet): Promise<void> {
+  let imageUrl: string | null = sheet.imageDataUrl
+  if (imageUrl?.startsWith('data:')) {
+    const storageRef = ref(getFirebaseStorage(), `users/${uid}/sheets/${sheet.id}.webp`)
+    await uploadString(storageRef, imageUrl, 'data_url')
+    imageUrl = await getDownloadURL(storageRef)
+  }
+  await setDoc(doc(getFirebaseDb(), SHEETS_COLLECTION, sheet.id), {
+    uid,
+    name: sheet.name,
+    savedAt: sheet.savedAt,
+    data: sheet.data,
+    imageUrl,
+  })
+}
+
+/**
+ * Called once per login (core/auth.ts): pushes up any sheet that only exists
+ * locally, pulls the rest of the cloud set into the local cache. Safe to call
+ * repeatedly — every write here is an idempotent overwrite-by-id.
+ */
+export async function reconcileSheetsWithCloud(uid: string): Promise<void> {
+  try {
+    const snap = await getDocs(query(collection(getFirebaseDb(), SHEETS_COLLECTION), where('uid', '==', uid), orderBy('savedAt', 'desc')))
+    const cloudSheets: SavedSheet[] = snap.docs.map((d) => {
+      const data = d.data() as any
+      return { id: d.id, name: data.name, savedAt: data.savedAt, data: data.data, imageDataUrl: data.imageUrl ?? null }
+    })
+    const cloudIds = new Set(cloudSheets.map(s => s.id))
+    const local = listSheets()
+
+    await Promise.allSettled(local.filter(s => !cloudIds.has(s.id)).map(s => uploadSheetToCloud(uid, s)))
+
+    const merged = new Map(local.map(s => [s.id, s]))
+    for (const cs of cloudSheets) merged.set(cs.id, cs)
+    const combined = Array.from(merged.values())
+      .sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''))
+      .slice(0, MAX_SHEETS)
+    localStorage.setItem(KEY, JSON.stringify(combined))
+  }
+  catch (e) {
+    console.warn('[library] cloud sheet reconcile failed:', e instanceof Error ? e.message : e)
+  }
 }
 
 /**

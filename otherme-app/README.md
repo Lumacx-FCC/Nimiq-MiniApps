@@ -13,12 +13,15 @@ as live voice avatars. Credits are purchased with **USDT (Polygon)** or
 | `/scenes` | Scene Creator — gpt-image-2 with character identity reference | login; 5 free, then 5 credits |
 | `/videos` | Video Creator — gemini-omni-flash (Interactions API), 3 free conversational edits per clip | login; 100 credits |
 | `/talk` | Avatar Studio — Gemini Live voice, lip-synced sprites | login; 1 credit/min, 3/sprite |
-| `/login` | Nimiq wallet (primary) / email | — |
+| `/login` | Nimiq wallet (primary) / real email+password / Google | — |
 | `/credits` | Balance, USDT/NIM top-up, history | login required |
+| `/profile` | Linked identities, account linking (pairing code), unlink | login required |
 
-Scene and video galleries persist in IndexedDB; character sheets in
-localStorage (`src/core/mediaStore.ts` / `src/character/library.ts` are the
-Firebase migration seams).
+Character sheets and custom avatars sync to Firestore + Storage once signed
+in, with localStorage as a read-through cache (`src/character/library.ts`,
+`src/roleplay/avatarLibrary.ts`). Scene and video galleries are still
+IndexedDB-only (`src/core/mediaStore.ts`) — cloud sync for those is staged
+for later (see item 4 below).
 
 Light/dark theme and EN/ES language toggles are available on every page.
 
@@ -57,43 +60,32 @@ Prices are at TEST levels (÷100) — see `src/core/config.ts`.
 
 Ordered by priority. Items 1–3 are the ones that cost users money or data today.
 
-### 1. Link a wallet and an email into one account
+### 1. Link a wallet and an email into one account — ✅ shipped
 
-**The problem.** Identity is `AuthUser.id` — the Nimiq address for wallet login,
-the email for email login ([`core-modules/.../auth/types.ts`](../core-modules/src/modules/auth/types.ts)) —
-and the credits key is `otherme:credits:<id>` (`src/core/credits.ts`). So a
-balance bought in Nimiq Pay does **not** appear when the same person signs in by
-email on desktop. Worse, email accounts aren't server accounts at all:
-`emailAuth.ts` stores them in localStorage, so an email account created on a
-phone doesn't exist on a desktop, and clearing site data destroys its balance.
+Email/Google are now real Firebase Auth identities (`src/core/authProviders.ts`),
+not localStorage stubs. `/profile` lets a signed-in user generate a short-lived
+pairing code (`functions/src/account/link/start`) and redeem it from a second
+account (`link/redeem-preview` → `link/commit`) — preview-before-commit, so the
+user sees the merge math before it's irreversible. The merge transaction
+(`functions/src/account/store.ts`) subtracts an already-granted welcome bonus
+before folding balances, so linking can't be used to farm welcome credits
+across throwaway accounts. Unlink requires a fresh re-authentication
+(`requireFreshUid`, Firebase's `auth_time` within 5 minutes) and revokes both
+sides' refresh tokens.
 
-**The fix**, exploiting the fact that a Firebase custom token can carry any uid —
-so the ledger stays keyed by the wallet address and email login resolves to it:
-
-1. Promote email/Google to real Firebase Auth identities (currently localStorage
-   stubs). This is the bulk of the work.
-2. Profile screen, wallet session: "Link a desktop login" → server issues a
-   single-use, short-TTL code bound to the address.
-3. Desktop: sign in by email, enter the code → server writes
-   `users/{address}.linkedUids` plus a reverse `identity_links/{uid}` map.
-4. Later email logins call `/api/account/resolve` → server mints a custom token
-   with **uid = the wallet address** → same ledger, orders, and history.
-5. Fold any local email-account balance in at link time via the existing one-time
-   `/api/credits/migrate` path (respect `MAX_IMPORT`).
-
-**Security:** linking grants access to a money balance. The code must be
-single-use, short-lived, and rate-limited, and unlinking should require
-re-authentication. Do item 2 first.
+Deferred by design, not forgotten: reversing a balance merge (one-way,
+support-assisted if it ever comes up), and self-service recovery when the
+canonical factor is lost and nothing was ever linked.
 
 ### 2. Rate limiting and abuse protection
 
-There is none anywhere in `functions/` — a known gap
-([`docs/server-side-credits.md`](docs/server-side-credits.md) §Spam).
-`/api/auth/challenge` and `/api/orders` are unbounded per caller, and the
-expensive AI routes (`/api/generate-video`, `/api/generate-avatar`) have no
-`requireUid` at all, so they spend our OpenAI/Gemini quota anonymously. Welcome
-credits can also be farmed by clearing storage, since `welcomeGranted` only
-guards wallet accounts.
+`functions/src/shared/rateLimit.ts` exists now (generic, Firestore-backed) but
+is only wired into the account-linking endpoints so far. `/api/auth/challenge`
+and `/api/orders` are still unbounded per caller, and the expensive AI routes
+(`/api/generate-video`, `/api/generate-avatar`) still have no `requireUid` at
+all, so they spend our OpenAI/Gemini quota anonymously. Welcome credits can
+also still be farmed by clearing storage on first signup (before any linking),
+since `welcomeGranted` only guards wallet accounts.
 
 ### 3. Don't lose a paid order on a failed claim
 
@@ -102,11 +94,20 @@ never checked, so if the claim call fails *after* the user's on-chain payment
 succeeded, the order sits `pending` until the 30-minute TTL sweep and the credits
 never arrive. Needs a retry with backoff and a recovery path keyed on the tx hash.
 
-### 4. Move saved work off the device
+### 4. Move saved work off the device — ✅ Stage 1 shipped, Stage 2/3 open
 
-Character sheets and avatars are in localStorage, scenes and videos in IndexedDB
-— all lost when a user clears site data or switches device. The seams are
-`src/character/library.ts` and `src/roleplay/avatarLibrary.ts`.
+Character sheets and custom avatars now sync to Firestore + Storage
+(`src/character/library.ts`, `src/roleplay/avatarLibrary.ts`) whenever a
+server session exists, with localStorage kept as a read-through cache — no
+UI changes needed, and fully local-only behavior is unchanged when logged
+out. Reconciliation runs once per login (`App.tsx`'s `useCloudMediaSync`).
+
+**Still open, staged deliberately**: scenes (Stage 2) and videos (Stage 3) are
+still IndexedDB-only. Videos are last on purpose — highest storage cost, and a
+`SavedVideo.interactionId` ties a saved video to a live Gemini Interactions
+API session that isn't durable across devices or time, so a synced-then-
+reloaded video needs a "start fresh" fallback rather than assuming it's always
+editable.
 
 ### 5. Gasless USDT via a meta-transaction relayer
 
@@ -164,4 +165,6 @@ checkpoint recorded server-side, if legal advises one).
 Done since the last revision of this list: on-chain tx verification before
 granting credits, signed-challenge wallet login, production prices and
 treasuries, automatic deletion of share-link files, Web Speech dictation as the
-in-wallet voice fallback, and the credits-per-sign-in-method disclosure.
+in-wallet voice fallback, the credits-per-sign-in-method disclosure, real
+Firebase Auth for email/Google, account linking (item 1), and cloud sync for
+character sheets + avatars (item 4, Stage 1).

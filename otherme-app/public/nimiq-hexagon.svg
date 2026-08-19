@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <!-- Nimiq Brand Gold Gradient -->
+    <linearGradient id="nimiq-gold-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFC000" />
+      <stop offset="100%" stop-color="#E58B00" />
+    </linearGradient>
+  </defs>
+
+  <!-- Hexagon with Rounded Corners -->
+  <polygon 
+    points="100,8 180,54 180,146 100,192 20,146 20,54" 
+    fill="url(#nimiq-gold-gradient)" 
+    stroke="url(#nimiq-gold-gradient)" 
+    stroke-width="16" 
+    stroke-linejoin="round" 
+  />
+</svg>

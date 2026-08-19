@@ -7,8 +7,9 @@
  *   POST /api/auth/verify     { address, publicKey, signature }   -> { token, address }
  */
 import type { Request, Response } from "express";
+import { getAuth } from "firebase-admin/auth";
 import { verifyNimiqSignature } from "./nimiqSignature.js";
-import { ensureUser, issueChallenge, mintSessionToken, takeChallenge } from "./store.js";
+import { ensureAccountUser, ensureUser, issueChallenge, mintSessionToken, resolveCanonicalUid, takeChallenge } from "./store.js";
 
 function normalizeAddress(addr: string): string {
   return addr.replace(/\s+/g, "").toUpperCase();
@@ -56,4 +57,37 @@ export async function handleAuthVerify(req: Request, res: Response): Promise<voi
   await ensureUser(address);
   const token = await mintSessionToken(address);
   res.status(200).json({ token, address });
+}
+
+/**
+ * Exchange a native Firebase ID token (from a real email/Google sign-in) for a
+ * canonical session token. Pre-account-linking (Part B), canonical uid always
+ * equals the native uid — the identity_links lookup is a forward-compatible
+ * no-op until linking exists.
+ */
+export async function handleAccountResolve(req: Request, res: Response): Promise<void> {
+  const header = req.headers.authorization || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    res.status(401).json({ error: "Missing Authorization: Bearer <idToken>" });
+    return;
+  }
+
+  let nativeUid: string;
+  let signInProvider: string | undefined;
+  try {
+    const decoded = await getAuth().verifyIdToken(match[1], true);
+    nativeUid = decoded.uid;
+    signInProvider = decoded.firebase?.sign_in_provider;
+  }
+  catch {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+
+  const canonicalUid = await resolveCanonicalUid(nativeUid);
+  const provider = signInProvider === "google.com" ? "google" : "email";
+  await ensureAccountUser(canonicalUid, provider);
+  const token = await mintSessionToken(canonicalUid, provider);
+  res.status(200).json({ token, uid: canonicalUid });
 }

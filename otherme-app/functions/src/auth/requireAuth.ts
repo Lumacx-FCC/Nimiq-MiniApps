@@ -15,8 +15,29 @@ export async function getAuthedUid(req: Request): Promise<string | null> {
   if (!match)
     return null;
   try {
-    const decoded = await getAuth().verifyIdToken(match[1]);
+    const decoded = await getAuth().verifyIdToken(match[1], true);
     return decoded.uid || null;
+  }
+  catch {
+    return null;
+  }
+}
+
+/** Resolve the caller's uid + provider label. Prefers the `provider` custom
+ * claim (set by mintSessionToken); falls back to the native `sign_in_provider`
+ * for a session that hasn't been through the canonical-session swap yet. */
+export async function getAuthedClaims(req: Request): Promise<{ uid: string; provider: "nimiq" | "email" | "google" } | null> {
+  const header = req.headers.authorization || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match)
+    return null;
+  try {
+    const decoded = await getAuth().verifyIdToken(match[1], true);
+    const claimProvider = (decoded as { provider?: string }).provider;
+    const provider = claimProvider === "nimiq" || claimProvider === "email" || claimProvider === "google"
+      ? claimProvider
+      : decoded.firebase?.sign_in_provider === "google.com" ? "google" : "email";
+    return { uid: decoded.uid, provider };
   }
   catch {
     return null;
@@ -31,4 +52,39 @@ export async function requireUid(req: Request, res: Response): Promise<string | 
     return null;
   }
   return uid;
+}
+
+/** Custom-token sign-in (mintSessionToken) and a native provider sign-in both
+ * stamp a fresh `auth_time` — this works uniformly for all three providers, no
+ * per-provider branching needed. */
+const FRESH_AUTH_MAX_AGE_SECONDS = 5 * 60;
+
+/**
+ * Resolve the caller's uid, requiring they authenticated within the last few
+ * minutes (Firebase's `auth_time` claim) — for actions where a stale, merely-
+ * still-valid session isn't enough proof (unlink). Sends 401 with
+ * code: "reauth-required" when the session is too old, distinct from missing/
+ * invalid auth, so the client can prompt a fresh sign-in instead of a login.
+ */
+export async function requireFreshUid(req: Request, res: Response): Promise<string | null> {
+  const header = req.headers.authorization || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  try {
+    const decoded = await getAuth().verifyIdToken(match[1], true);
+    const ageSeconds = Date.now() / 1000 - decoded.auth_time;
+    if (ageSeconds > FRESH_AUTH_MAX_AGE_SECONDS) {
+      res.status(401).json({ error: "Please sign in again to confirm this action.", code: "reauth-required" });
+      return null;
+    }
+    return decoded.uid;
+  }
+  catch (e) {
+    console.error("[requireFreshUid] verifyIdToken failed:", e instanceof Error ? e.message : e);
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
 }

@@ -3,10 +3,9 @@
  * Vue `useAuth` composable — provider logic is imported, not reimplemented.
  */
 import type { AuthUser } from '@core/auth/types'
-import { loginWithEmail, signUpWithEmail } from '@core/auth/emailAuth'
-import { isGoogleLoginAvailable, loginWithGoogle } from '@core/auth/googleAuth'
 import { isInsideNimiqPay, loginWithNimiq } from '@core/auth/nimiqAuth'
 import { getConfig } from '@core/config'
+import { completeGoogleRedirect, isGoogleLoginAvailable, loginWithEmail, loginWithGoogle, requestPasswordReset, signUpWithEmail } from './authProviders'
 import { createStore, useStore } from './store'
 import { loadCreditsFor } from './credits'
 import { clearServerSession, establishServerSession } from './session'
@@ -36,6 +35,19 @@ const authStore = createStore<AuthState>({ user: readStoredUser(), isBusy: false
 // Keep credits in sync with the restored session.
 if (authStore.get().user)
   loadCreditsFor(authStore.get().user!.id)
+
+// Pick up a Google sign-in that redirected away and came back (WebView /
+// popup-blocked fallback in loginWithGoogle). No-op when there was no pending
+// redirect. Runs once per page load, before any component reads the store.
+completeGoogleRedirect().then((user) => {
+  if (!user)
+    return
+  persist(user)
+  loadCreditsFor(user.id)
+  authStore.set({ user, isBusy: false, error: null })
+}).catch((e) => {
+  console.warn('[auth] google redirect completion failed:', e instanceof Error ? e.message : e)
+})
 
 function persist(next: AuthUser | null): void {
   if (next)
@@ -80,6 +92,10 @@ export const auth = {
   loginWithGoogle: () => runLogin(loginWithGoogle),
   loginWithEmail: (email: string, password: string) => runLogin(() => loginWithEmail(email, password)),
   signUpWithEmail: (email: string, password: string) => runLogin(() => signUpWithEmail(email, password)),
+  requestPasswordReset,
+  /** Apply any AuthUser-producing action (e.g. accountLink.commitLink) through
+   * the same persist + credits-reload + store-update path as a normal login. */
+  syncSession: (fn: () => Promise<AuthUser>) => runLogin(fn),
   logout: () => {
     persist(null)
     authStore.set({ user: null, isBusy: false, error: null })

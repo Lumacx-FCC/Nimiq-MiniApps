@@ -2,7 +2,7 @@
  * Shared header: OM logo (home navigation), credits pill when logged in,
  * theme + language toggles. Present on every page.
  */
-import { Coins, Home, Images, LogOut, Moon, Sun } from 'lucide-react'
+import { Coins, Home, Images, LogOut, Moon, Sun, User } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
@@ -53,6 +53,16 @@ export default function AppHeader({ title }: { title?: string }) {
           >
             <Coins size={15} style={{ color: 'var(--nimiq-gold)' }} />
             <strong>{balance}</strong>
+          </Link>
+        )}
+        {isLoggedIn && pathname !== '/profile' && (
+          <Link
+            to="/profile"
+            className="icon-chip no-underline"
+            aria-label={lang === 'es' ? 'Perfil' : 'Profile'}
+            title={lang === 'es' ? 'Perfil' : 'Profile'}
+          >
+            <User size={16} />
           </Link>
         )}
         <button className="icon-chip" onClick={toggleTheme} aria-label={lang === 'es' ? 'Cambiar tema' : 'Toggle theme'}>

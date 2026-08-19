@@ -59,18 +59,54 @@ export async function takeChallenge(address: string): Promise<Challenge | null> 
   return snap.data() as Challenge;
 }
 
-/** Idempotently create the user profile. Balance/welcome credits are Phase 2. */
+/**
+ * Idempotently create the user profile. Balance/welcome credits are Phase 2.
+ *
+ * Races with credits/store.ts's migrateBalance(), which the client also fires
+ * on every login (via onSessionChange -> syncFromServer) — whichever creates
+ * the doc first wins, and migrateBalance doesn't know `provider`. So on an
+ * existing doc, backfill `provider` via merge if it's still missing, rather
+ * than only setting it at creation.
+ */
 export async function ensureUser(address: string): Promise<void> {
   const ref = users().doc(address);
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (snap.exists)
+    if (!snap.exists) {
+      tx.set(ref, { nimAddress: address, provider: "nimiq", balance: 0, welcomeGranted: false, createdAt: Date.now() });
       return;
-    tx.set(ref, { nimAddress: address, balance: 0, welcomeGranted: false, createdAt: Date.now() });
+    }
+    if (!snap.data()?.provider)
+      tx.set(ref, { provider: "nimiq" }, { merge: true });
   });
 }
 
-/** Mint a Firebase custom token (uid = Nimiq address) for signInWithCustomToken. */
-export async function mintSessionToken(address: string): Promise<string> {
-  return getAuth().createCustomToken(address, { provider: "nimiq" });
+/** Mint a Firebase custom token for signInWithCustomToken. `uid` is the Nimiq
+ * address for wallet logins, or the native Firebase uid for email/Google. */
+export async function mintSessionToken(uid: string, provider: "nimiq" | "email" | "google" = "nimiq"): Promise<string> {
+  return getAuth().createCustomToken(uid, { provider });
+}
+
+/** Idempotently create the user profile for a non-wallet (email/Google) uid.
+ * See ensureUser's doc comment for why an existing doc still gets a provider
+ * backfill instead of being left alone. */
+export async function ensureAccountUser(uid: string, provider: "email" | "google"): Promise<void> {
+  const ref = users().doc(uid);
+  await db().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      tx.set(ref, { provider, balance: 0, welcomeGranted: false, createdAt: Date.now() });
+      return;
+    }
+    if (!snap.data()?.provider)
+      tx.set(ref, { provider }, { merge: true });
+  });
+}
+
+/** Resolve a native (freshly-authenticated) uid to its canonical uid via
+ * identity_links. No doc = you are canonical (the default, pre-Part-B case). */
+export async function resolveCanonicalUid(nativeUid: string): Promise<string> {
+  const snap = await db().collection("identity_links").doc(nativeUid).get();
+  const data = snap.data() as { canonicalUid?: string } | undefined;
+  return data?.canonicalUid || nativeUid;
 }

@@ -12,12 +12,12 @@
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 /** Starter credits for a brand-new ledger (mirrors client WELCOME_CREDITS). */
-const WELCOME_CREDITS = 5;
+export const WELCOME_CREDITS = 5;
 /** Sanity ceiling on a self-imported balance (test credits; tighten for real money). */
 const MAX_IMPORT = 1_000_000;
 const HISTORY_LIMIT = 25;
 
-export type LedgerKind = "welcome" | "migrate" | "purchase" | "spend";
+export type LedgerKind = "welcome" | "migrate" | "purchase" | "spend" | "link-merge";
 
 export interface LedgerEntry {
   delta: number;
@@ -29,20 +29,38 @@ export interface LedgerEntry {
 }
 
 const db = () => getFirestore();
-const userRef = (address: string) => db().collection("users").doc(address);
+export const userRef = (address: string) => db().collection("users").doc(address);
 // Top-level ledger_entries/{address}/entries/{id} — matches firestore.rules and
 // the design-doc data model (so a Phase 4 client onSnapshot passes the rules).
-const entriesRef = (address: string) => db().collection("ledger_entries").doc(address).collection("entries");
+export const entriesRef = (address: string) => db().collection("ledger_entries").doc(address).collection("entries");
+
+export interface LinkedAccount {
+  uid: string;
+  provider: "nimiq" | "email" | "google" | "unknown";
+}
 
 export interface BalanceView {
   balance: number;
   welcomeGranted: boolean;
   history: LedgerEntry[];
+  primaryProvider: string | null;
+  linkedAccounts: LinkedAccount[];
 }
 
 async function readHistory(address: string): Promise<LedgerEntry[]> {
   const snap = await entriesRef(address).orderBy("at", "desc").limit(HISTORY_LIMIT).get();
   return snap.docs.map(d => d.data() as LedgerEntry);
+}
+
+/** Resolve each linked uid's provider label for display (Part D). Best-effort —
+ * a uid that vanished (shouldn't happen) is just omitted, not an error. */
+async function readLinkedAccounts(linkedUids: string[]): Promise<LinkedAccount[]> {
+  if (!linkedUids.length)
+    return [];
+  const snaps = await Promise.all(linkedUids.map(uid => userRef(uid).get()));
+  return snaps
+    .filter(s => s.exists)
+    .map(s => ({ uid: s.id, provider: (s.data()?.provider as LinkedAccount["provider"]) ?? "unknown" }));
 }
 
 export async function getBalance(address: string): Promise<BalanceView> {
@@ -52,6 +70,8 @@ export async function getBalance(address: string): Promise<BalanceView> {
     balance: data.balance ?? 0,
     welcomeGranted: data.welcomeGranted ?? false,
     history: await readHistory(address),
+    primaryProvider: data.provider ?? null,
+    linkedAccounts: await readLinkedAccounts(data.linkedUids ?? []),
   };
 }
 

@@ -144,7 +144,10 @@ export default function Scenes() {
 
   const flash = (text: string, type: 'success' | 'error' = 'success') => {
     setNotice({ text, type })
-    window.setTimeout(() => setNotice(null), 4000)
+    // Errors render as the ErrorNotice modal — dismiss on click only, so the
+    // user has time to actually read it instead of a timer clearing it early.
+    if (type !== 'error')
+      window.setTimeout(() => setNotice(null), 4000)
   }
 
   const generate = async () => {
