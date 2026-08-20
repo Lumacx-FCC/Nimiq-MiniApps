@@ -75,21 +75,25 @@ const PAY_COPY = {
     approving: { title: 'Approve the payment', body: 'Confirm the payment in your Nimiq Pay wallet to continue.' },
     submitted: { title: 'Payment sent 🎉', body: 'Your payment is on its way. The blockchain network is now confirming it — this usually takes about a minute. You can keep this screen open; your credits will appear automatically.' },
     confirming: { title: 'Confirming your payment…', body: 'Crypto payments are verified by the network instead of a bank, so there’s a short wait while it’s double-checked — usually around a minute. There’s no need to pay again. Just hang tight; your credits will be added the moment it clears.', hint: 'Estimated wait: ~1 minute' },
-    slow: { title: 'Almost there…', body: 'The network is a little busy right now, so this is taking a bit longer than usual — occasionally a few minutes. Your payment is safe and your credits will be added as soon as it’s confirmed.' },
+    slow: { title: 'Almost there…', body: 'The network is a little busy right now, so this is taking longer than usual — it can take up to 20 minutes in rare cases. Your payment is safe, and your credits will be added automatically as soon as it’s confirmed, even if you leave this screen.' },
     granted: { title: 'All set! ✨', body: 'Your payment is confirmed and your credits have been added.' },
     failed: { title: 'We couldn’t confirm this payment', body: 'If funds left your wallet, they’re safe — you were not charged twice and no credits were lost. Contact support with your transaction ID and we’ll sort it out.', txLabel: 'Transaction ID' },
     close: 'Done',
     dismiss: 'Close',
+    background: 'Continue in background',
+    resume: 'Payment still confirming — tap to view',
   },
   es: {
     approving: { title: 'Aprueba el pago', body: 'Confirma el pago en tu monedero Nimiq Pay para continuar.' },
     submitted: { title: 'Pago enviado 🎉', body: 'Tu pago está en camino. La red blockchain lo está confirmando — esto suele tardar alrededor de un minuto. Puedes dejar esta pantalla abierta; tus créditos aparecerán automáticamente.' },
     confirming: { title: 'Confirmando tu pago…', body: 'Los pagos con cripto los verifica la red en lugar de un banco, así que hay una breve espera mientras se comprueba — normalmente cerca de un minuto. No necesitas pagar de nuevo. Solo espera un momento; tus créditos se añadirán en cuanto se confirme.', hint: 'Espera estimada: ~1 minuto' },
-    slow: { title: 'Ya casi…', body: 'La red está un poco ocupada ahora mismo, así que está tardando un poco más de lo normal — a veces unos minutos. Tu pago está seguro y tus créditos se añadirán en cuanto se confirme.' },
+    slow: { title: 'Ya casi…', body: 'La red está un poco ocupada ahora mismo, así que está tardando más de lo normal — en casos raros puede tardar hasta 20 minutos. Tu pago está seguro y tus créditos se añadirán automáticamente en cuanto se confirme, aunque salgas de esta pantalla.' },
     granted: { title: '¡Listo! ✨', body: 'Tu pago está confirmado y tus créditos ya se añadieron.' },
     failed: { title: 'No pudimos confirmar este pago', body: 'Si salió dinero de tu monedero, está seguro — no se te cobró dos veces ni se perdieron créditos. Contacta con soporte con tu ID de transacción y lo resolvemos.', txLabel: 'ID de transacción' },
     close: 'Listo',
     dismiss: 'Cerrar',
+    background: 'Continuar en segundo plano',
+    resume: 'Pago aún confirmándose — toca para ver',
   },
 } as const
 
@@ -104,11 +108,22 @@ export default function Credits() {
   const allPacks = packs()
   const [selected, setSelected] = useState<CreditPack>(allPacks[1] || allPacks[0])
   const [nimQuote, setNimQuote] = useState<{ amount: number, credits: number, rateIsLive: boolean } | null>(null)
+  // The confirming/slow wait can run minutes long (rarely up to the reconciler's
+  // 20-min grace window) — the modal must not trap the user for that whole time.
+  // Hiding it here is purely a display choice: watchOrder's Firestore listener
+  // (and the purchase itself) keeps running regardless, and a terminal result
+  // (granted/failed) always forces the overlay back so it's never silently lost.
+  const [overlayHidden, setOverlayHidden] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn)
       navigate('/login', { state: { redirectTo: '/credits' } })
   }, [isLoggedIn, navigate])
+
+  useEffect(() => {
+    if (flow.status === 'approving' || flow.status === 'granted' || flow.status === 'failed')
+      setOverlayHidden(false)
+  }, [flow.status])
 
   useEffect(() => {
     let cancelled = false
@@ -139,7 +154,7 @@ export default function Credits() {
     <div className="page-shell">
       <AppHeader />
 
-      {flowCopy && (
+      {flowCopy && !overlayHidden && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} role="dialog" aria-modal="true">
           <div className="om-card w-full max-w-sm text-center">
             {flowInProgress && (
@@ -161,8 +176,21 @@ export default function Credits() {
             {flowStatus === 'failed' && (
               <button className="om-button secondary w-full mt-4" onClick={resetPurchase}>{pt.dismiss}</button>
             )}
+            {flowInProgress && (
+              <button className="om-button secondary w-full mt-4" onClick={() => setOverlayHidden(true)}>{pt.background}</button>
+            )}
           </div>
         </div>
+      )}
+
+      {flowInProgress && overlayHidden && (
+        <button
+          className="om-button secondary w-full mb-4 flex items-center justify-center gap-2"
+          onClick={() => setOverlayHidden(false)}
+        >
+          <Loader2 size={16} className="animate-spin" />
+          {pt.resume}
+        </button>
       )}
 
       <div className="om-card mb-4 text-center">
