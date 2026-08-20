@@ -112,9 +112,10 @@ This yields a live `*.web.app` URL to smoke-test before wiring the domain.
 - **Prices:** ~~`src/core/config.ts` currently uses TEST prices (÷100, e.g. $0.01/60 credits)~~
   — **done**: `src/core/config.ts` now holds real early-bird production prices (live since
   2026-07-27), not the ÷100 test values described here.
-- **Treasuries:** the NIM + EVM treasury addresses in `config.ts` are shared TEST accounts.
-  Swap to **your own** addresses if you want to keep the funds from real purchases. **Still
-  open** — this one hasn't shipped yet (see backlog Tier 1.4).
+- **Treasuries:** ~~the NIM + EVM treasury addresses in `config.ts` are shared TEST accounts~~
+  — **done**: `functions/src/sharedPricing.ts` now holds the real production treasury
+  addresses (rotated 19 Aug 2026 off the pair that had been publicly labeled "test" in the
+  repo's history; single-sourced there since PR #27, imported by both server and client).
 
 ## Known limitations of the lean deploy (accepted for now)
 - ~~**Data stays on-device**~~ — **done**: character sheets and custom avatars now sync to

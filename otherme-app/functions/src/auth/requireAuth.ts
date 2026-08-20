@@ -25,8 +25,11 @@ export async function getAuthedUid(req: Request): Promise<string | null> {
 
 /** Resolve the caller's uid + provider label. Prefers the `provider` custom
  * claim (set by mintSessionToken); falls back to the native `sign_in_provider`
- * for a session that hasn't been through the canonical-session swap yet. */
-export async function getAuthedClaims(req: Request): Promise<{ uid: string; provider: "nimiq" | "email" | "google" } | null> {
+ * for a session that hasn't been through the canonical-session swap yet.
+ * `emailVerified` is the decoded token's standard `email_verified` claim —
+ * used to gate the welcome-credit grant for the `email` provider (Nimiq and
+ * Google are always considered verified; Google sign-in is pre-verified). */
+export async function getAuthedClaims(req: Request): Promise<{ uid: string; provider: "nimiq" | "email" | "google"; emailVerified: boolean } | null> {
   const header = req.headers.authorization || "";
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match)
@@ -37,7 +40,8 @@ export async function getAuthedClaims(req: Request): Promise<{ uid: string; prov
     const provider = claimProvider === "nimiq" || claimProvider === "email" || claimProvider === "google"
       ? claimProvider
       : decoded.firebase?.sign_in_provider === "google.com" ? "google" : "email";
-    return { uid: decoded.uid, provider };
+    const emailVerified = provider === "email" ? Boolean(decoded.email_verified) : true;
+    return { uid: decoded.uid, provider, emailVerified };
   }
   catch {
     return null;

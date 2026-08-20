@@ -9,13 +9,24 @@
 import type { Request, Response } from "express";
 import { getAuth } from "firebase-admin/auth";
 import { isNimiqAddress, normalizeAddress } from "../shared/nimiqAddress.js";
+import { checkRateLimit } from "../shared/rateLimit.js";
 import { verifyNimiqSignature } from "./nimiqSignature.js";
-import { ensureAccountUser, ensureUser, issueChallenge, mintSessionToken, resolveCanonicalUid, takeChallenge } from "./store.js";
+import { ensureAccountUser, ensureUser, issueChallenge, mintSessionToken, resolveCanonicalUid, takeChallenge, userExists } from "./store.js";
+
+const CHALLENGE_LIMIT = 10;
+const CHALLENGE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const NEW_ACCOUNT_LIMIT = 10;
+const NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60 * 1000; // 1 day
 
 export async function handleAuthChallenge(req: Request, res: Response): Promise<void> {
   const address = normalizeAddress(String(req.body?.address || ""));
   if (!isNimiqAddress(address)) {
     res.status(400).json({ error: "A valid Nimiq address is required" });
+    return;
+  }
+  const allowed = await checkRateLimit("auth-challenge", address, CHALLENGE_LIMIT, CHALLENGE_WINDOW_MS);
+  if (!allowed) {
+    res.status(429).json({ error: "Too many login attempts — try again shortly." });
     return;
   }
   const { message, expiresAt } = await issueChallenge(address);
@@ -84,6 +95,17 @@ export async function handleAccountResolve(req: Request, res: Response): Promise
   }
 
   const canonicalUid = await resolveCanonicalUid(nativeUid);
+
+  // Only bound the velocity of brand-new accounts per IP — an existing user
+  // logging back in is never rate-limited by this check.
+  if (!(await userExists(canonicalUid))) {
+    const allowed = await checkRateLimit("new-account", req.ip || "unknown", NEW_ACCOUNT_LIMIT, NEW_ACCOUNT_WINDOW_MS);
+    if (!allowed) {
+      res.status(429).json({ error: "Too many new accounts from this network — try again later." });
+      return;
+    }
+  }
+
   const provider = signInProvider === "google.com" ? "google" : "email";
   await ensureAccountUser(canonicalUid, provider);
   const token = await mintSessionToken(canonicalUid, provider);
