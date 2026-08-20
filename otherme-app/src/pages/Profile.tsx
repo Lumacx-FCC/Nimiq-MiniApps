@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
 import { checkEmailVerified, resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
+import { claimWelcomeCredits } from '../core/credits'
 import { AccountOverview, LinkedAccount, PreviewLinkResult, commitLink, getAccountOverview, previewLink, startLink, unlinkSecondary } from '../core/accountLink'
 import { getCurrentUid, onSessionChange } from '../core/session'
 import AppHeader from '../components/AppHeader'
@@ -56,6 +57,9 @@ const COPY = {
     resend: 'Resend verification email',
     resendSent: 'Sent — check your inbox.',
     resendError: 'Could not send — try again in a moment.',
+    claimCredits: 'Claim your 5 welcome credits',
+    claimSent: 'Credits claimed! ✨',
+    claimError: 'Could not claim right now — try again in a moment.',
   },
   es: {
     title: 'Gestionar perfil',
@@ -96,6 +100,9 @@ const COPY = {
     resend: 'Reenviar email de verificación',
     resendSent: 'Enviado — revisa tu bandeja de entrada.',
     resendError: 'No pudimos enviarlo — intenta de nuevo en un momento.',
+    claimCredits: 'Reclamar tus 5 créditos de bienvenida',
+    claimSent: '¡Créditos reclamados! ✨',
+    claimError: 'No pudimos reclamarlos ahora — intenta de nuevo en un momento.',
   },
 } as const
 
@@ -129,6 +136,7 @@ export default function Profile() {
 
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null)
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [claimState, setClaimState] = useState<'idle' | 'claiming' | 'claimed' | 'error'>('idle')
 
   useEffect(() => {
     if (!isLoggedIn)
@@ -159,6 +167,23 @@ export default function Profile() {
     }
     catch {
       setResendState('error')
+    }
+  }
+
+  const handleClaim = async () => {
+    setClaimState('claiming')
+    try {
+      const result = await claimWelcomeCredits()
+      if (result.ok) {
+        setClaimState('claimed')
+        loadOverview()
+      }
+      else {
+        setClaimState('error')
+      }
+    }
+    catch {
+      setClaimState('error')
     }
   }
 
@@ -311,7 +336,19 @@ export default function Profile() {
           <p className="text-sm font-semibold flex items-center gap-2 m-0"><ShieldCheck size={16} style={{ color: 'var(--nimiq-green)' }} />{t.verifiedGoogle}</p>
         )}
         {user?.provider === 'email' && emailVerified === true && (
-          <p className="text-sm font-semibold flex items-center gap-2 m-0"><CheckCircle2 size={16} style={{ color: 'var(--nimiq-green)' }} />{t.verifiedEmail}</p>
+          <>
+            <p className="text-sm font-semibold flex items-center gap-2 m-0"><CheckCircle2 size={16} style={{ color: 'var(--nimiq-green)' }} />{t.verifiedEmail}</p>
+            {!overview?.welcomeGranted && (
+              claimState === 'claimed'
+                ? <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-green)' }}>{t.claimSent}</p>
+                : (
+                    <>
+                      <button className="om-button gold w-full mt-3" disabled={claimState === 'claiming'} onClick={handleClaim}>{t.claimCredits}</button>
+                      {claimState === 'error' && <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-red)' }}>{t.claimError}</p>}
+                    </>
+                  )
+            )}
+          </>
         )}
         {user?.provider === 'email' && emailVerified === false && (
           <>

@@ -13,7 +13,7 @@ import { getNimUsdRate } from '@core/credits/rates'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { WELCOME_CREDITS } from './config'
 import { serverUrl } from './api'
-import { getFirebaseDb } from './firebase'
+import { getFirebaseAuth, getFirebaseDb } from './firebase'
 import { getSessionToken, onSessionChange } from './session'
 import { createStore, useStore } from './store'
 
@@ -165,6 +165,31 @@ async function syncFromServer(): Promise<void> {
   catch {
     // Offline / server down — keep the local cache; nothing depends on this.
   }
+}
+
+/**
+ * Explicit "Claim your welcome credits" action (Profile page, email/password
+ * accounts only — nimiq/google are granted automatically on first login,
+ * never held). /api/credits/migrate already grants once-eligible-and-only-
+ * once, so no new server endpoint is needed — the reason this needs its own
+ * function rather than just calling syncFromServer() is the force-refreshed
+ * token: Firebase ID tokens cache `email_verified` as of when they were
+ * issued, so right after clicking the verification link the token the app is
+ * already holding still says unverified until something forces a new one.
+ * Without this, the grant silently doesn't land until the token happens to
+ * naturally refresh (next login, or up to ~an hour later).
+ */
+export async function claimWelcomeCredits(): Promise<{ ok: boolean; balance?: number }> {
+  const user = getFirebaseAuth().currentUser
+  if (!user)
+    return { ok: false }
+  await user.getIdToken(true)
+  const data = await authedFetch('/api/credits/migrate', { localBalance: creditsStore.get().balance })
+  if (data && typeof data.balance === 'number') {
+    adoptServerBalance(data)
+    return { ok: true, balance: data.balance }
+  }
+  return { ok: false }
 }
 
 async function reconcileSpend(amount: number, kind: string): Promise<void> {
