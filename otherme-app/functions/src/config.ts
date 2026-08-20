@@ -26,8 +26,20 @@ export const ORDER_TTL_MS = 30 * 60 * 1000;
 export const USDT_POLYGON_CONTRACT = "0xc2132d05d31c914a87c6611c10748aeb04b58e8f";
 /** keccak256("Transfer(address,address,uint256)") — ERC-20 Transfer log topic. */
 export const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-/** Public Polygon RPC used when POLYGON_RPC_URL is unset. */
-export const POLYGON_RPC_DEFAULT = "https://polygon-rpc.com";
+/**
+ * Public Polygon RPC used when POLYGON_RPC_URL is unset. polygon-rpc.com
+ * started returning 401 Unauthorized on every reconciler call 2026-08-20
+ * (real incident: a real USDT order sat unverified for 20+ min and
+ * auto-failed on the grace-window timeout); briefly tried rpc.ankr.com/polygon
+ * as a replacement, now on publicnode.com. If this one also starts failing,
+ * check `firebase functions:log --only reconcile` for the exact RPC error
+ * before swapping again — and consider moving to a real POLYGON_RPC_URL
+ * secret (see RECONCILE_SECRETS in index.ts) instead of another free public
+ * endpoint. NOTE: must be a plain HTTP(S) JSON-RPC endpoint — `jsonRpc()` in
+ * reconciler/rpc.ts does a plain `fetch()` POST, no WebSocket client, so a
+ * `wss://` endpoint will NOT work here without separate client code.
+ */
+export const POLYGON_RPC_DEFAULT = "https://polygon-bor-rpc.publicnode.com";
 
 /**
  * Public Nimiq Albatross RPC used when NIMIQ_RPC_URL is unset. NimiqWatch runs a

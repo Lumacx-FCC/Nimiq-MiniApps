@@ -17,7 +17,7 @@
  * confirmation depth.
  */
 import type { OrderWithId } from "../orders/store.js";
-import { CONFIRMATIONS_NIM, NIM_TREASURY_ADDRESS } from "../config.js";
+import { CONFIRMATIONS_NIM } from "../config.js";
 import { jsonRpc, type RpcOptions } from "./rpc.js";
 import type { VerifyResult } from "./verify.js";
 
@@ -56,8 +56,12 @@ export async function verifyNim(order: OrderWithId, rpcUrl: string, auth?: RpcOp
   if (!tx)
     return { state: "pending", reason: "tx not in history yet" };
 
+  // Compare against the order's own frozen recipient, not the live config —
+  // see verifyUsdt.ts's identical comment for why (a treasury rotation must
+  // not strand an order that legitimately paid whatever address was current
+  // when it was created).
   const recipient = normAddr(tx.to);
-  if (recipient !== normAddr(NIM_TREASURY_ADDRESS))
+  if (recipient !== normAddr(order.expectedRecipient))
     return { state: "mismatch", reason: `wrong recipient ${recipient}` };
 
   // Freeze-and-require with a 1% floor for rounding drift (§7/§13).
