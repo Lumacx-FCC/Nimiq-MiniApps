@@ -156,13 +156,20 @@ Follow-up after #22 shipped to production and got real on-device use.
 
 ## Known gaps carried forward
 
-1. **No rate limiting anywhere in `functions/`** — `/api/auth/challenge` and
-   `/api/orders` are unbounded per user, and the expensive AI routes have no
-   auth check at all. Becomes a spend liability the moment a relayer exists.
-2. **`claimServerOrder` is fire-and-forget** — HTTP status is never checked, so
-   a failed claim after a successful on-chain payment is silently swallowed and
-   the order expires without granting credits.
-3. **`@nimiq/mini-app-sdk` is unpinned** (`"latest"`) against a 0.x package.
-4. **USDT grant path unproven in production** (needs POL in a test wallet).
-5. **NIM verification runs on a third-party RPC** (NimiqWatch); the self-hosted
-   VM is specced but not stood up.
+This section stopped being updated after PR #22 while this changelog's PR
+table did too — the live backlog (see `[[otherme-backlog-plan]]` memory, or
+ask Claude "what's outstanding") has been the actual tracking mechanism since
+mid-August. As of 2026-08-20:
+
+1. ✅ **Rate limiting** — closed. `/api/auth/challenge`, `/api/orders`, the AI
+   routes, new-account creation, and `/api/credits/record-purchase` are all
+   rate-limited now (PR #28).
+2. ✅ **`claimServerOrder` fire-and-forget** — closed. Now retries with
+   backoff and persists an unclaimed claim for retry on session restore
+   (PR #28).
+3. ✅ **`@nimiq/mini-app-sdk` unpinned** — closed, pinned to `0.1.0` (PR #25).
+4. ✅ **USDT grant path unproven in production** — closed, proven via two real
+   purchases 2026-08-20 (backlog Tier 2.7).
+5. **NIM verification runs on a third-party RPC** (NimiqWatch) — still true,
+   explicitly accepted as a permanent dependency (backlog Tier 2.4,
+   cancelled — no self-hosted VM will be built).
