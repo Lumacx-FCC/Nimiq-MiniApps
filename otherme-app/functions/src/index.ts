@@ -21,7 +21,7 @@ import { handleGrantCredits } from "./admin/routes.js";
 import { handleLinkCommit, handleLinkRedeemPreview, handleLinkStart, handleUnlink } from "./account/routes.js";
 import { handleAccountResolve, handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
 import { getAuthedUid } from "./auth/requireAuth.js";
-import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
+import { handleAcceptTerms, handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
 import { runReconcile } from "./reconciler/reconcile.js";
 import { checkRateLimit } from "./shared/rateLimit.js";
@@ -531,6 +531,7 @@ router.get("/credits/balance", wrap(handleBalance));
 router.post("/credits/migrate", json, wrap(handleMigrate));
 router.post("/credits/spend", json, wrap(handleSpend));
 router.post("/credits/record-purchase", json, wrap(handleRecordPurchase));
+router.post("/credits/accept-terms", json, wrap(handleAcceptTerms));
 
 // Payment intents (Phase 3). The reconciler (Phase 4) verifies claimed txs.
 router.post("/orders", json, wrap(handleCreateOrder));

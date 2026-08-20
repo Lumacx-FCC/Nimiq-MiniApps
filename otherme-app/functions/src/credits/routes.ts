@@ -7,11 +7,12 @@
  *   POST /api/credits/migrate         { localBalance }
  *   POST /api/credits/spend           { amount, kind }
  *   POST /api/credits/record-purchase { txHash, credits, method, amount }
+ *   POST /api/credits/accept-terms
  */
 import type { Request, Response } from "express";
 import { getAuthedClaims, getAuthedUid } from "../auth/requireAuth.js";
 import { checkRateLimit } from "../shared/rateLimit.js";
-import { getBalance, migrateBalance, recordPurchase, spend } from "./store.js";
+import { acceptTerms, getBalance, migrateBalance, recordPurchase, spend } from "./store.js";
 
 const RECORD_PURCHASE_LIMIT = 10;
 const RECORD_PURCHASE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -76,4 +77,11 @@ export async function handleRecordPurchase(req: Request, res: Response): Promise
   }
   const result = await recordPurchase(uid, txHash, credits, method, amount);
   res.status("error" in result ? 400 : 200).json(result);
+}
+
+export async function handleAcceptTerms(req: Request, res: Response): Promise<void> {
+  const uid = await requireUid(req, res);
+  if (!uid)
+    return;
+  res.status(200).json(await acceptTerms(uid));
 }

@@ -51,6 +51,11 @@ export interface BalanceView {
    * (no new stored field): once verified, `migrateBalance` grants immediately
    * and this flips false in that same response. */
   emailVerificationPending: boolean;
+  /** True once this uid has ever accepted the Terms & Conditions (Tier 2.5).
+   * `createOrder` (orders/store.ts) refuses to create a purchase order until
+   * this is true — a first-purchase acceptance checkpoint, not a per-purchase
+   * one. */
+  termsAccepted: boolean;
 }
 
 async function readHistory(address: string): Promise<LedgerEntry[]> {
@@ -79,7 +84,27 @@ export async function getBalance(address: string): Promise<BalanceView> {
     primaryProvider: data.provider ?? null,
     linkedAccounts: await readLinkedAccounts(data.linkedUids ?? []),
     emailVerificationPending: data.provider === "email" && !(data.welcomeGranted ?? false),
+    termsAccepted: Boolean(data.termsAcceptedAt),
   };
+}
+
+/**
+ * Record the first (and only meaningful) Terms & Conditions acceptance for a
+ * uid — the actual legal record `createOrder` checks before allowing a
+ * purchase. Idempotent: a repeat call keeps the original timestamp rather
+ * than overwriting it, since "when did they first accept" is the fact that
+ * matters, not "when did they last click the button again."
+ */
+export async function acceptTerms(address: string): Promise<{ termsAccepted: true; termsAcceptedAt: number }> {
+  const ref = userRef(address);
+  const snap = await ref.get();
+  const existing = snap.data()?.termsAcceptedAt as number | undefined;
+  if (existing)
+    return { termsAccepted: true, termsAcceptedAt: existing };
+
+  const termsAcceptedAt = Date.now();
+  await ref.set({ termsAcceptedAt }, { merge: true });
+  return { termsAccepted: true, termsAcceptedAt };
 }
 
 /**

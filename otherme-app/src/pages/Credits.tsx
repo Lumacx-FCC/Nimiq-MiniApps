@@ -10,7 +10,7 @@ import { USDT_GAS_REQUIRED } from '@core/credits/payUsdt'
 import { useSettings } from '../app/providers'
 import { resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
-import { useCredits } from '../core/credits'
+import { acceptTerms, useCredits } from '../core/credits'
 import { REGULAR_USD } from '../core/config'
 import AppHeader from '../components/AppHeader'
 
@@ -43,6 +43,13 @@ const COPY = {
     resend: 'Resend verification email',
     resendSent: 'Verification email sent — check your inbox.',
     resendError: 'Could not send the email — try again in a moment.',
+    termsGateTitle: 'Before your first purchase',
+    termsGateBody: 'Please confirm you agree to the Terms & Conditions.',
+    termsGateLink: 'Read the Terms & Conditions',
+    termsGateCheckbox: 'I agree to the Terms & Conditions',
+    termsGateConfirm: 'Confirm and continue',
+    termsGateCancel: 'Cancel',
+    termsGateError: 'Could not confirm — try again in a moment.',
   },
   es: {
     balance: 'Tus créditos',
@@ -72,6 +79,13 @@ const COPY = {
     resend: 'Reenviar email de verificación',
     resendSent: 'Email de verificación enviado — revisa tu bandeja de entrada.',
     resendError: 'No pudimos enviar el email — intenta de nuevo en un momento.',
+    termsGateTitle: 'Antes de tu primera compra',
+    termsGateBody: 'Por favor confirma que aceptas los Términos y Condiciones.',
+    termsGateLink: 'Leer los Términos y Condiciones',
+    termsGateCheckbox: 'Acepto los Términos y Condiciones',
+    termsGateConfirm: 'Confirmar y continuar',
+    termsGateCancel: 'Cancelar',
+    termsGateError: 'No pudimos confirmar — intenta de nuevo en un momento.',
   },
 } as const
 
@@ -114,12 +128,18 @@ export default function Credits() {
   const pt = PAY_COPY[lang]
   const navigate = useNavigate()
   const { isLoggedIn, user, logout } = useAuth()
-  const { balance, history, isPaying, error, flow, resetPurchase, packs, highlights, quoteUsdt, quoteNimFor, buyWithUsdt, buyWithNim, emailVerificationPending } = useCredits()
+  const { balance, history, isPaying, error, flow, resetPurchase, packs, highlights, quoteUsdt, quoteNimFor, buyWithUsdt, buyWithNim, emailVerificationPending, termsAccepted } = useCredits()
 
   const allPacks = packs()
   const [selected, setSelected] = useState<CreditPack>(allPacks[1] || allPacks[0])
   const [nimQuote, setNimQuote] = useState<{ amount: number, credits: number, rateIsLive: boolean } | null>(null)
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  // First-purchase Terms & Conditions checkpoint (Tier 2.5) — a one-time gate
+  // in front of whichever pay method the user actually clicked. `pendingBuy`
+  // holds that choice while the checkbox confirmation is open.
+  const [pendingBuy, setPendingBuy] = useState<'nim' | 'usdt' | null>(null)
+  const [termsChecked, setTermsChecked] = useState(false)
+  const [termsGateState, setTermsGateState] = useState<'idle' | 'confirming' | 'error'>('idle')
 
   const handleResend = async () => {
     setResendState('sending')
@@ -130,6 +150,30 @@ export default function Credits() {
     catch {
       setResendState('error')
     }
+  }
+
+  const startBuy = (method: 'nim' | 'usdt') => {
+    if (termsAccepted) {
+      void (method === 'nim' ? buyWithNim(selected) : buyWithUsdt(selected))
+      return
+    }
+    setPendingBuy(method)
+    setTermsChecked(false)
+    setTermsGateState('idle')
+  }
+
+  const confirmTermsAndBuy = async () => {
+    if (!pendingBuy)
+      return
+    setTermsGateState('confirming')
+    const ok = await acceptTerms().catch(() => false)
+    if (!ok) {
+      setTermsGateState('error')
+      return
+    }
+    const method = pendingBuy
+    setPendingBuy(null)
+    void (method === 'nim' ? buyWithNim(selected) : buyWithUsdt(selected))
   }
   // The confirming/slow wait can run minutes long (rarely up to the reconciler's
   // 20-min grace window) — the modal must not trap the user for that whole time.
@@ -176,6 +220,35 @@ export default function Credits() {
   return (
     <div className="page-shell">
       <AppHeader />
+
+      {pendingBuy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} role="dialog" aria-modal="true">
+          <div className="om-card w-full max-w-sm text-center">
+            <h3 className="text-lg font-extrabold mb-2">{t.termsGateTitle}</h3>
+            <p className="text-sm mb-3" style={{ color: 'var(--text-60)' }}>{t.termsGateBody}</p>
+            <a href="/terms" target="_blank" rel="noreferrer" className="text-sm font-semibold" style={{ color: 'var(--nimiq-light-blue)' }}>
+              {t.termsGateLink}
+            </a>
+            <label className="flex items-center gap-2 mt-4 text-sm text-left cursor-pointer">
+              <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} />
+              {t.termsGateCheckbox}
+            </label>
+            {termsGateState === 'error' && (
+              <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-red)' }}>{t.termsGateError}</p>
+            )}
+            <button
+              className="om-button gold w-full mt-4"
+              disabled={!termsChecked || termsGateState === 'confirming'}
+              onClick={confirmTermsAndBuy}
+            >
+              {t.termsGateConfirm}
+            </button>
+            <button className="om-button secondary w-full mt-2" disabled={termsGateState === 'confirming'} onClick={() => setPendingBuy(null)}>
+              {t.termsGateCancel}
+            </button>
+          </div>
+        </div>
+      )}
 
       {flowCopy && !overlayHidden && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} role="dialog" aria-modal="true">
@@ -296,7 +369,7 @@ export default function Credits() {
         <div className="flex flex-col gap-2.5">
           {/* NIM is the primary rail: buyWithNim fetches its own rate, so the
               button never waits on the display quote. */}
-          <button className="om-button gold w-full" disabled={isPaying} onClick={() => buyWithNim(selected)}>
+          <button className="om-button gold w-full" disabled={isPaying} onClick={() => startBuy('nim')}>
             {t.payNim}
             {nimQuote ? ` · ${t.approx} ${nimQuote.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} NIM` : ''}
           </button>
@@ -305,7 +378,7 @@ export default function Credits() {
               {t.nimCredits(nimQuote.credits)} ({nimQuote.rateIsLive ? t.liveRate : t.fallbackRate}) — {t.bonus}
             </p>
           )}
-          <button className="om-button green w-full" disabled={isPaying} onClick={() => buyWithUsdt(selected)}>
+          <button className="om-button green w-full" disabled={isPaying} onClick={() => startBuy('usdt')}>
             {t.payUsdt} · {usdt.amount} USDT
           </button>
           <p className="text-xs text-center m-0" style={{ color: 'var(--text-40)' }}>

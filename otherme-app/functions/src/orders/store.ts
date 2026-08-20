@@ -25,6 +25,7 @@ import {
   ORDER_TTL_MS,
   USDT_DECIMALS,
 } from "../config.js";
+import { userRef } from "../credits/store.js";
 
 export type OrderMethod = "nim" | "usdt";
 export type OrderStatus = "pending" | "submitted" | "confirmed" | "granted" | "failed" | "expired";
@@ -66,6 +67,13 @@ export interface OrderView {
 const orders = () => getFirestore().collection("orders");
 
 export async function createOrder(userId: string, method: OrderMethod, packUsd: number): Promise<OrderView | { error: string }> {
+  // First-purchase Terms & Conditions checkpoint (Tier 2.5) — server-side, not
+  // just a client-side button gate, so it can't be skipped by calling this
+  // endpoint directly.
+  const userSnap = await userRef(userId).get();
+  if (!userSnap.data()?.termsAcceptedAt)
+    return { error: "Terms not accepted" };
+
   const pack = findPack(packUsd);
   if (!pack)
     return { error: "Unknown credit pack" };

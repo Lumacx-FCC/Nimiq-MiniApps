@@ -20,6 +20,12 @@ const fake = vi.hoisted(() => {
         const exists = store.has(path);
         return { exists, data: () => (exists ? { ...store.get(path) } : undefined) };
       },
+      // Non-transactional write, for functions like acceptTerms that don't
+      // need a full transaction — mirrors the real DocumentReference.set().
+      set: async (data: Record<string, unknown>, opts?: { merge?: boolean }) => {
+        const existing = store.get(path);
+        store.set(path, opts?.merge && existing ? { ...existing, ...data } : { ...data });
+      },
     };
   }
   function makeCollectionRef(path: string): any {
@@ -87,7 +93,7 @@ vi.mock("firebase-admin/firestore", () => ({
 
 beforeEach(() => fake.reset());
 
-const { grantPromo, migrateBalance, recordPurchase, spend, WELCOME_CREDITS } = await import("./store.js");
+const { acceptTerms, getBalance, grantPromo, migrateBalance, recordPurchase, spend, WELCOME_CREDITS } = await import("./store.js");
 
 describe("spend", () => {
   it("rejects when the balance is insufficient", async () => {
@@ -204,6 +210,26 @@ describe("emailVerificationPending — surfaced to the client so it can explain 
     fake.seed("users/NQwallet", { provider: "nimiq", balance: 0, welcomeGranted: false });
     const result = await migrateBalance("NQwallet", 0, false);
     expect(result.emailVerificationPending).toBe(false);
+  });
+});
+
+describe("acceptTerms — first-purchase Terms & Conditions checkpoint (Tier 2.5)", () => {
+  it("is false in getBalance before any acceptance", async () => {
+    const result = await getBalance("NQtest");
+    expect(result.termsAccepted).toBe(false);
+  });
+
+  it("records acceptance and flips getBalance's termsAccepted", async () => {
+    const result = await acceptTerms("NQtest");
+    expect(result.termsAccepted).toBe(true);
+    expect(fake.peek("users/NQtest").termsAcceptedAt).toBe(result.termsAcceptedAt);
+    expect((await getBalance("NQtest")).termsAccepted).toBe(true);
+  });
+
+  it("keeps the original timestamp on a repeat call instead of overwriting it", async () => {
+    const first = await acceptTerms("NQtest");
+    const second = await acceptTerms("NQtest");
+    expect(second.termsAcceptedAt).toBe(first.termsAcceptedAt);
   });
 });
 
