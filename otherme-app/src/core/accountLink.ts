@@ -52,13 +52,22 @@ export interface AccountOverview {
   balance: number
   primaryProvider: string | null
   linkedAccounts: LinkedAccount[]
+  /** True once the welcome grant has actually landed — used to decide
+   * whether to show the "Claim your welcome credits" action (email accounts
+   * only; nimiq/google are granted automatically and never show it). */
+  welcomeGranted: boolean
 }
 
 /** Balance + linked-identity summary for the Profile page. Defensive against
  * an older-deployed backend that predates linkedAccounts/primaryProvider. */
 export async function getAccountOverview(): Promise<AccountOverview> {
   const data = await authedGet<Partial<AccountOverview>>('/api/credits/balance')
-  return { balance: data.balance ?? 0, primaryProvider: data.primaryProvider ?? null, linkedAccounts: data.linkedAccounts ?? [] }
+  return {
+    balance: data.balance ?? 0,
+    primaryProvider: data.primaryProvider ?? null,
+    linkedAccounts: data.linkedAccounts ?? [],
+    welcomeGranted: data.welcomeGranted ?? false,
+  }
 }
 
 export interface StartLinkResult {
