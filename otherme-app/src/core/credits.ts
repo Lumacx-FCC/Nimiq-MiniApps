@@ -63,11 +63,15 @@ interface CreditsState {
   isPaying: boolean
   error: string | null
   flow: PurchaseFlow
+  /** True while the welcome grant is on hold pending email verification
+   * (email/password accounts only) — adopted from the server, see
+   * functions/src/credits/store.ts's BalanceView. */
+  emailVerificationPending: boolean
 }
 
 const IDLE_FLOW: PurchaseFlow = { status: 'idle' }
 
-const creditsStore = createStore<CreditsState>({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
+const creditsStore = createStore<CreditsState>({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
 let loadedForUser: string | null = null
 
 const storageKey = (userId: string) => `${getConfig().appId}:credits:${userId}`
@@ -77,16 +81,18 @@ export function loadCreditsFor(userId: string): void {
     const raw = localStorage.getItem(storageKey(userId))
     if (!raw) {
       // First session for this account — welcome credits fund the starter renders.
-      creditsStore.set({ balance: WELCOME_CREDITS, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
+      // Optimistic only: an ineligible (unverified email) account gets this
+      // corrected down to 0 by the next syncFromServer() round trip.
+      creditsStore.set({ balance: WELCOME_CREDITS, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
       loadedForUser = userId
       persist()
       return
     }
     const parsed = JSON.parse(raw) as { balance: number, history: PurchaseRecord[] }
-    creditsStore.set({ balance: parsed.balance ?? 0, history: parsed.history ?? [], isPaying: false, error: null, flow: IDLE_FLOW })
+    creditsStore.set({ balance: parsed.balance ?? 0, history: parsed.history ?? [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
   }
   catch {
-    creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
+    creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
   }
   loadedForUser = userId
 }
@@ -94,7 +100,7 @@ export function loadCreditsFor(userId: string): void {
 export function unloadCredits(): void {
   loadedForUser = null
   stopWatch()
-  creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW })
+  creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
 }
 
 function persist(): void {
@@ -136,7 +142,13 @@ async function authedFetch(path: string, body?: unknown): Promise<any | null> {
 /** Adopt the server's authoritative balance into the local cache. */
 function adoptServerBalance(data: any | null): void {
   if (data && typeof data.balance === 'number') {
-    creditsStore.update(s => ({ ...s, balance: data.balance }))
+    creditsStore.update(s => ({
+      ...s,
+      balance: data.balance,
+      // Not every endpoint's response carries this (e.g. /api/credits/spend
+      // doesn't) — only overwrite when it's actually present.
+      emailVerificationPending: typeof data.emailVerificationPending === 'boolean' ? data.emailVerificationPending : s.emailVerificationPending,
+    }))
     persist()
   }
 }
@@ -510,5 +522,6 @@ export function useCredits() {
     isPaying: state.isPaying,
     error: state.error,
     flow: state.flow,
+    emailVerificationPending: state.emailVerificationPending,
   }
 }

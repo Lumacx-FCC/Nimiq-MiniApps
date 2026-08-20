@@ -28,6 +28,9 @@ const COPY = {
     forgotPassword: 'Forgot password?',
     resetSent: 'If an account exists for that email, a reset link is on its way.',
     resetNeedsEmail: 'Enter your email above first, then tap "Forgot password?"',
+    verifyEmailTitle: 'Check your email',
+    verifyEmailBody: 'We sent a verification link to your inbox. Your 5 welcome credits unlock as soon as you verify — you can keep exploring in the meantime.',
+    continueButton: 'Continue',
   },
   es: {
     title: 'Bienvenido a Other Me',
@@ -47,6 +50,9 @@ const COPY = {
     forgotPassword: '¿Olvidaste tu contraseña?',
     resetSent: 'Si existe una cuenta con ese email, un enlace para restablecerla está en camino.',
     resetNeedsEmail: 'Escribe tu email arriba primero y luego toca "¿Olvidaste tu contraseña?"',
+    verifyEmailTitle: 'Revisa tu email',
+    verifyEmailBody: 'Enviamos un enlace de verificación a tu bandeja de entrada. Tus 5 créditos de bienvenida se desbloquean en cuanto verifiques — mientras tanto puedes seguir explorando.',
+    continueButton: 'Continuar',
   },
 } as const
 
@@ -93,6 +99,10 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [resetNotice, setResetNotice] = useState<string | null>(null)
+  // A signup delays navigation for one extra tap — the welcome credits are on
+  // hold until the email is verified, and that's easy to miss if the app
+  // immediately whisks the user into the gallery as if nothing were pending.
+  const [signedUp, setSignedUp] = useState(false)
 
   const finish = (ok: boolean) => {
     if (ok)
@@ -103,7 +113,12 @@ export default function Login() {
     event.preventDefault()
     if (!email || !password)
       return
-    finish(mode === 'login' ? await loginWithEmail(email, password) : await signUpWithEmail(email, password))
+    if (mode === 'login') {
+      finish(await loginWithEmail(email, password))
+      return
+    }
+    if (await signUpWithEmail(email, password))
+      setSignedUp(true)
   }
 
   const forgotPassword = async () => {
@@ -209,6 +224,17 @@ export default function Login() {
         {resetNotice && <div className="nq-notice info mt-4" role="status">{resetNotice}</div>}
         {error && <div className="nq-notice error" role="alert">{error}</div>}
       </div>
+
+      {signedUp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} role="dialog" aria-modal="true">
+          <div className="om-card w-full max-w-sm text-center">
+            <Mail size={30} className="mx-auto mb-3" style={{ color: 'var(--nimiq-light-blue)' }} />
+            <h3 className="text-lg font-extrabold mb-2">{t.verifyEmailTitle}</h3>
+            <p className="text-sm m-0" style={{ color: 'var(--text-60)' }}>{t.verifyEmailBody}</p>
+            <button className="om-button w-full mt-4" onClick={() => { setSignedUp(false); finish(true) }}>{t.continueButton}</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

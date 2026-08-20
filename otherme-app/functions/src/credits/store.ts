@@ -46,6 +46,11 @@ export interface BalanceView {
   history: LedgerEntry[];
   primaryProvider: string | null;
   linkedAccounts: LinkedAccount[];
+  /** True while the welcome grant is withheld pending email verification
+   * (Tier 1.3) — the `email` provider hasn't been granted yet. Purely derived
+   * (no new stored field): once verified, `migrateBalance` grants immediately
+   * and this flips false in that same response. */
+  emailVerificationPending: boolean;
 }
 
 async function readHistory(address: string): Promise<LedgerEntry[]> {
@@ -73,6 +78,7 @@ export async function getBalance(address: string): Promise<BalanceView> {
     history: await readHistory(address),
     primaryProvider: data.provider ?? null,
     linkedAccounts: await readLinkedAccounts(data.linkedUids ?? []),
+    emailVerificationPending: data.provider === "email" && !(data.welcomeGranted ?? false),
   };
 }
 

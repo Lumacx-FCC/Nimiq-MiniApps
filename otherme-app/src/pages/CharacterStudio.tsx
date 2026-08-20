@@ -62,6 +62,7 @@ const COPY = {
     share: 'Share',
     costPerRender: (balance: number) => `${SHEET_RENDER_CREDITS} credit per render · balance: ${balance}`,
     insufficientCredits: 'Not enough credits — top up to keep rendering',
+    verifyEmailForCredits: 'Verify your email to unlock your welcome credits — check your inbox for the link, or resend it from your Profile page.',
     talk: 'Talk with this character',
     library: 'My characters',
     empty: 'Nothing saved yet — generate a sheet and press Save.',
@@ -106,6 +107,7 @@ const COPY = {
     share: 'Compartir',
     costPerRender: (balance: number) => `${SHEET_RENDER_CREDITS} crédito por render · saldo: ${balance}`,
     insufficientCredits: 'No tienes créditos suficientes — recarga para seguir renderizando',
+    verifyEmailForCredits: 'Verifica tu email para desbloquear tus créditos de bienvenida — revisa tu bandeja de entrada por el enlace, o reenvíalo desde tu perfil.',
     talk: 'Hablar con este personaje',
     library: 'Mis personajes',
     empty: 'Nada guardado aún — genera una hoja y presiona Guardar.',
@@ -140,7 +142,7 @@ export default function CharacterStudio() {
   const t = COPY[lang]
   const navigate = useNavigate()
   const { isLoggedIn } = useAuth()
-  const { balance } = useCredits()
+  const { balance, emailVerificationPending } = useCredits()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [image, setImage] = useState<string | null>(() => sessionStorage.getItem(PENDING_REFERENCE_KEY))
@@ -231,7 +233,7 @@ export default function CharacterStudio() {
       return
     }
     if (isLoggedIn && creditsApi.balance < SHEET_RENDER_CREDITS) {
-      flash(t.insufficientCredits, 'error')
+      flash(emailVerificationPending ? t.verifyEmailForCredits : t.insufficientCredits, 'error')
       return
     }
     setIsGenerating(true)
