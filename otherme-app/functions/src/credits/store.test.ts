@@ -187,6 +187,26 @@ describe("migrateBalance — welcome-credit eligibility gating (Tier 1.3)", () =
   });
 });
 
+describe("emailVerificationPending — surfaced to the client so it can explain the hold", () => {
+  it("is true for an email-provider account still awaiting its welcome grant", async () => {
+    fake.seed("users/NQtest", { provider: "email", balance: 0, welcomeGranted: false });
+    const result = await migrateBalance("NQtest", 0, false);
+    expect(result.emailVerificationPending).toBe(true);
+  });
+
+  it("flips false the moment the grant actually lands", async () => {
+    fake.seed("users/NQtest", { provider: "email", balance: 0, welcomeGranted: false });
+    const result = await migrateBalance("NQtest", 0, true);
+    expect(result.emailVerificationPending).toBe(false);
+  });
+
+  it("is never true for nimiq or google providers", async () => {
+    fake.seed("users/NQwallet", { provider: "nimiq", balance: 0, welcomeGranted: false });
+    const result = await migrateBalance("NQwallet", 0, false);
+    expect(result.emailVerificationPending).toBe(false);
+  });
+});
+
 describe("grantPromo — idempotent by dedupeKey", () => {
   it("grants credits on the first call", async () => {
     const result = await grantPromo("NQwinner", 1000, "contest prize", "contest2026-NQwinner");

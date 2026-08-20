@@ -2,12 +2,13 @@
  * Credits — balance, pack purchase with USDT (Polygon) or NIM (+50% bonus),
  * purchase history. Mirrors core-modules CreditsCard on the React bridge.
  */
-import { Coins, History, Loader2, LogOut, PartyPopper, Smartphone, Sparkles } from 'lucide-react'
+import { Coins, History, Loader2, LogOut, Mail, PartyPopper, Smartphone, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreditPack } from '@core/config'
 import { USDT_GAS_REQUIRED } from '@core/credits/payUsdt'
 import { useSettings } from '../app/providers'
+import { resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
 import { useCredits } from '../core/credits'
 import { REGULAR_USD } from '../core/config'
@@ -37,6 +38,11 @@ const COPY = {
     logout: 'Log out',
     loginNeeded: 'Log in to buy and use credits.',
     accountScope: 'Credits stay with the sign-in method you buy them with by default. To use the same balance elsewhere, sign in the same way, or link another login from your Profile page.',
+    verifyHoldTitle: 'Your welcome credits are on hold',
+    verifyHoldBody: 'Verify your email to unlock your 5 welcome credits. Check your inbox for the link we sent when you signed up.',
+    resend: 'Resend verification email',
+    resendSent: 'Verification email sent — check your inbox.',
+    resendError: 'Could not send the email — try again in a moment.',
   },
   es: {
     balance: 'Tus créditos',
@@ -61,6 +67,11 @@ const COPY = {
     logout: 'Cerrar sesión',
     loginNeeded: 'Inicia sesión para comprar y usar créditos.',
     accountScope: 'Los créditos quedan ligados al método con el que los compras por defecto. Para usar el mismo saldo en otro lugar, inicia sesión de la misma forma, o vincula otro inicio de sesión desde tu perfil.',
+    verifyHoldTitle: 'Tus créditos de bienvenida están en espera',
+    verifyHoldBody: 'Verifica tu email para desbloquear tus 5 créditos de bienvenida. Revisa tu bandeja de entrada por el enlace que enviamos cuando te registraste.',
+    resend: 'Reenviar email de verificación',
+    resendSent: 'Email de verificación enviado — revisa tu bandeja de entrada.',
+    resendError: 'No pudimos enviar el email — intenta de nuevo en un momento.',
   },
 } as const
 
@@ -103,11 +114,23 @@ export default function Credits() {
   const pt = PAY_COPY[lang]
   const navigate = useNavigate()
   const { isLoggedIn, user, logout } = useAuth()
-  const { balance, history, isPaying, error, flow, resetPurchase, packs, highlights, quoteUsdt, quoteNimFor, buyWithUsdt, buyWithNim } = useCredits()
+  const { balance, history, isPaying, error, flow, resetPurchase, packs, highlights, quoteUsdt, quoteNimFor, buyWithUsdt, buyWithNim, emailVerificationPending } = useCredits()
 
   const allPacks = packs()
   const [selected, setSelected] = useState<CreditPack>(allPacks[1] || allPacks[0])
   const [nimQuote, setNimQuote] = useState<{ amount: number, credits: number, rateIsLive: boolean } | null>(null)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  const handleResend = async () => {
+    setResendState('sending')
+    try {
+      await resendVerificationEmail()
+      setResendState('sent')
+    }
+    catch {
+      setResendState('error')
+    }
+  }
   // The confirming/slow wait can run minutes long (rarely up to the reconciler's
   // 20-min grace window) — the modal must not trap the user for that whole time.
   // Hiding it here is purely a display choice: watchOrder's Firestore listener
@@ -191,6 +214,24 @@ export default function Credits() {
           <Loader2 size={16} className="animate-spin" />
           {pt.resume}
         </button>
+      )}
+
+      {emailVerificationPending && (
+        <div className="om-card mb-4" style={{ borderColor: 'var(--nimiq-gold)' }}>
+          <p className="text-sm font-extrabold mb-1 flex items-center gap-2">
+            <Mail size={16} style={{ color: 'var(--nimiq-gold)' }} />
+            {t.verifyHoldTitle}
+          </p>
+          <p className="text-xs m-0" style={{ color: 'var(--text-60)' }}>{t.verifyHoldBody}</p>
+          {resendState === 'sent'
+            ? <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-green)' }}>{t.resendSent}</p>
+            : (
+                <button className="om-button secondary w-full mt-3" disabled={resendState === 'sending'} onClick={handleResend}>
+                  {t.resend}
+                </button>
+              )}
+          {resendState === 'error' && <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-red)' }}>{t.resendError}</p>}
+        </div>
       )}
 
       <div className="om-card mb-4 text-center">

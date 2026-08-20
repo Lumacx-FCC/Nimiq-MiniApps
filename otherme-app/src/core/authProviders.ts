@@ -91,6 +91,25 @@ export async function requestPasswordReset(email: string): Promise<void> {
   await sendPasswordResetEmail(getFirebaseAuth(), email)
 }
 
+/** Re-send the verification link to the currently signed-in email account. */
+export async function resendVerificationEmail(): Promise<void> {
+  const user = getFirebaseAuth().currentUser
+  if (!user)
+    throw new Error('Not signed in.')
+  await sendEmailVerification(user)
+}
+
+/** Live `emailVerified` for the current session, refreshed from Firebase first
+ * (the cached token can be stale if verification happened in another tab/
+ * after the last sign-in). Null if there's no signed-in user at all. */
+export async function checkEmailVerified(): Promise<boolean | null> {
+  const auth = getFirebaseAuth()
+  if (!auth.currentUser)
+    return null
+  await auth.currentUser.reload()
+  return auth.currentUser.emailVerified
+}
+
 export function isGoogleLoginAvailable(): boolean {
   return GOOGLE_LOGIN_ENABLED
 }

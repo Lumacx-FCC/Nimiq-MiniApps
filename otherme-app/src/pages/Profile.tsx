@@ -4,10 +4,11 @@
  * normal login (see core/accountLink.ts doc comment) rather than building a
  * separate reauthenticateWithCredential/-Popup path.
  */
-import { Check, Coins, Copy, KeyRound, Link2, Mail, Unlink, User, Wallet } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Coins, Copy, KeyRound, Link2, Mail, ShieldCheck, Unlink, User, Wallet } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../app/providers'
+import { checkEmailVerified, resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
 import { AccountOverview, LinkedAccount, PreviewLinkResult, commitLink, getAccountOverview, previewLink, startLink, unlinkSecondary } from '../core/accountLink'
 import { getCurrentUid, onSessionChange } from '../core/session'
@@ -47,6 +48,14 @@ const COPY = {
     providerEmail: 'Email account',
     providerGoogle: 'Google account',
     providerUnknown: 'Linked account',
+    verification: 'Verification',
+    verifiedWallet: 'Verified via wallet signature',
+    verifiedGoogle: 'Verified via Google sign-in',
+    verifiedEmail: 'Email verified',
+    unverifiedEmail: 'Email not verified — welcome credits are on hold',
+    resend: 'Resend verification email',
+    resendSent: 'Sent — check your inbox.',
+    resendError: 'Could not send — try again in a moment.',
   },
   es: {
     title: 'Gestionar perfil',
@@ -79,6 +88,14 @@ const COPY = {
     providerEmail: 'Cuenta de email',
     providerGoogle: 'Cuenta de Google',
     providerUnknown: 'Cuenta vinculada',
+    verification: 'Verificación',
+    verifiedWallet: 'Verificado mediante firma de wallet',
+    verifiedGoogle: 'Verificado mediante inicio de sesión con Google',
+    verifiedEmail: 'Email verificado',
+    unverifiedEmail: 'Email no verificado — los créditos de bienvenida están en espera',
+    resend: 'Reenviar email de verificación',
+    resendSent: 'Enviado — revisa tu bandeja de entrada.',
+    resendError: 'No pudimos enviarlo — intenta de nuevo en un momento.',
   },
 } as const
 
@@ -110,6 +127,9 @@ export default function Profile() {
   const [reauthPassword, setReauthPassword] = useState('')
   const [uidCopied, setUidCopied] = useState(false)
 
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
   useEffect(() => {
     if (!isLoggedIn)
       navigate('/login', { state: { redirectTo: '/profile' } })
@@ -117,6 +137,10 @@ export default function Profile() {
 
   const loadOverview = () => {
     getAccountOverview().then(setOverview).catch(e => setError(e instanceof Error ? e.message : String(e)))
+    // Refreshed straight from Firebase (not the cached AuthUser) — verifying
+    // in another tab doesn't update the token this session is already
+    // holding until something forces a reload.
+    checkEmailVerified().then(setEmailVerified).catch(() => {})
   }
   // Wait for Firebase's own session-restore signal rather than firing on
   // mount — on a fresh page load (bookmark, hard refresh), isLoggedIn (from
@@ -126,6 +150,17 @@ export default function Profile() {
     if (uid)
       loadOverview()
   }), [])
+
+  const handleResend = async () => {
+    setResendState('sending')
+    try {
+      await resendVerificationEmail()
+      setResendState('sent')
+    }
+    catch {
+      setResendState('error')
+    }
+  }
 
   if (!isLoggedIn) {
     return (
@@ -265,6 +300,31 @@ export default function Profile() {
           </button>
         </div>
         <p className="text-xs mt-1" style={{ color: 'var(--text-40)' }}>{t.uidHint}</p>
+      </div>
+
+      <div className="om-card mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-40)' }}>{t.verification}</p>
+        {user?.provider === 'nimiq' && (
+          <p className="text-sm font-semibold flex items-center gap-2 m-0"><ShieldCheck size={16} style={{ color: 'var(--nimiq-green)' }} />{t.verifiedWallet}</p>
+        )}
+        {user?.provider === 'google' && (
+          <p className="text-sm font-semibold flex items-center gap-2 m-0"><ShieldCheck size={16} style={{ color: 'var(--nimiq-green)' }} />{t.verifiedGoogle}</p>
+        )}
+        {user?.provider === 'email' && emailVerified === true && (
+          <p className="text-sm font-semibold flex items-center gap-2 m-0"><CheckCircle2 size={16} style={{ color: 'var(--nimiq-green)' }} />{t.verifiedEmail}</p>
+        )}
+        {user?.provider === 'email' && emailVerified === false && (
+          <>
+            <p className="text-sm font-semibold flex items-center gap-2 m-0" style={{ color: 'var(--nimiq-gold)' }}>
+              <AlertTriangle size={16} />
+              {t.unverifiedEmail}
+            </p>
+            {resendState === 'sent'
+              ? <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-green)' }}>{t.resendSent}</p>
+              : <button className="om-button secondary w-full mt-3" disabled={resendState === 'sending'} onClick={handleResend}>{t.resend}</button>}
+            {resendState === 'error' && <p className="text-xs mt-2 font-semibold m-0" style={{ color: 'var(--nimiq-red)' }}>{t.resendError}</p>}
+          </>
+        )}
       </div>
 
       <CollapsibleCard
