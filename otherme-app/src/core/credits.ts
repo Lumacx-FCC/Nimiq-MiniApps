@@ -67,11 +67,17 @@ interface CreditsState {
    * (email/password accounts only) — adopted from the server, see
    * functions/src/credits/store.ts's BalanceView. */
   emailVerificationPending: boolean
+  /** True once this account has ever accepted the Terms & Conditions (Tier
+   * 2.5) — adopted from the server. `createOrder` refuses to create a
+   * purchase order server-side until this is true, so the client-side gate
+   * (Credits.tsx) is UX, not the actual enforcement. */
+  termsAccepted: boolean
 }
 
 const IDLE_FLOW: PurchaseFlow = { status: 'idle' }
+const DEFAULT_CREDITS_STATE: CreditsState = { balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false, termsAccepted: false }
 
-const creditsStore = createStore<CreditsState>({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
+const creditsStore = createStore<CreditsState>({ ...DEFAULT_CREDITS_STATE })
 let loadedForUser: string | null = null
 
 const storageKey = (userId: string) => `${getConfig().appId}:credits:${userId}`
@@ -83,16 +89,16 @@ export function loadCreditsFor(userId: string): void {
       // First session for this account — welcome credits fund the starter renders.
       // Optimistic only: an ineligible (unverified email) account gets this
       // corrected down to 0 by the next syncFromServer() round trip.
-      creditsStore.set({ balance: WELCOME_CREDITS, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
+      creditsStore.set({ ...DEFAULT_CREDITS_STATE, balance: WELCOME_CREDITS })
       loadedForUser = userId
       persist()
       return
     }
     const parsed = JSON.parse(raw) as { balance: number, history: PurchaseRecord[] }
-    creditsStore.set({ balance: parsed.balance ?? 0, history: parsed.history ?? [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
+    creditsStore.set({ ...DEFAULT_CREDITS_STATE, balance: parsed.balance ?? 0, history: parsed.history ?? [] })
   }
   catch {
-    creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
+    creditsStore.set({ ...DEFAULT_CREDITS_STATE })
   }
   loadedForUser = userId
 }
@@ -100,7 +106,7 @@ export function loadCreditsFor(userId: string): void {
 export function unloadCredits(): void {
   loadedForUser = null
   stopWatch()
-  creditsStore.set({ balance: 0, history: [], isPaying: false, error: null, flow: IDLE_FLOW, emailVerificationPending: false })
+  creditsStore.set({ ...DEFAULT_CREDITS_STATE })
 }
 
 function persist(): void {
@@ -145,9 +151,10 @@ function adoptServerBalance(data: any | null): void {
     creditsStore.update(s => ({
       ...s,
       balance: data.balance,
-      // Not every endpoint's response carries this (e.g. /api/credits/spend
-      // doesn't) — only overwrite when it's actually present.
+      // Not every endpoint's response carries these (e.g. /api/credits/spend
+      // doesn't) — only overwrite when actually present.
       emailVerificationPending: typeof data.emailVerificationPending === 'boolean' ? data.emailVerificationPending : s.emailVerificationPending,
+      termsAccepted: typeof data.termsAccepted === 'boolean' ? data.termsAccepted : s.termsAccepted,
     }))
     persist()
   }
@@ -190,6 +197,20 @@ export async function claimWelcomeCredits(): Promise<{ ok: boolean; balance?: nu
     return { ok: true, balance: data.balance }
   }
   return { ok: false }
+}
+
+/**
+ * Record first-purchase Terms & Conditions acceptance (Tier 2.5). Idempotent
+ * server-side (keeps the original timestamp on a repeat call) — safe to call
+ * every time the user confirms the checkpoint, even if they'd technically
+ * already accepted from another device.
+ */
+export async function acceptTerms(): Promise<boolean> {
+  const data = await authedFetch('/api/credits/accept-terms', {})
+  if (!data?.termsAccepted)
+    return false
+  creditsStore.update(s => ({ ...s, termsAccepted: true }))
+  return true
 }
 
 async function reconcileSpend(amount: number, kind: string): Promise<void> {
@@ -548,5 +569,6 @@ export function useCredits() {
     error: state.error,
     flow: state.flow,
     emailVerificationPending: state.emailVerificationPending,
+    termsAccepted: state.termsAccepted,
   }
 }
