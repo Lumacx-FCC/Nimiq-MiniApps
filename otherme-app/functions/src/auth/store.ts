@@ -110,3 +110,9 @@ export async function resolveCanonicalUid(nativeUid: string): Promise<string> {
   const data = snap.data() as { canonicalUid?: string } | undefined;
   return data?.canonicalUid || nativeUid;
 }
+
+/** Whether a users/{uid} profile has already been created. */
+export async function userExists(uid: string): Promise<boolean> {
+  const snap = await users().doc(uid).get();
+  return snap.exists;
+}

@@ -88,22 +88,41 @@ Deferred by design, not forgotten: reversing a balance merge (one-way,
 support-assisted if it ever comes up), and self-service recovery when the
 canonical factor is lost and nothing was ever linked.
 
-### 2. Rate limiting and abuse protection
+### 2. Rate limiting and abuse protection — ✅ shipped
 
-`functions/src/shared/rateLimit.ts` exists now (generic, Firestore-backed) but
-is only wired into the account-linking endpoints so far. `/api/auth/challenge`
-and `/api/orders` are still unbounded per caller, and the expensive AI routes
-(`/api/generate-video`, `/api/generate-avatar`) still have no `requireUid` at
-all, so they spend our OpenAI/Gemini quota anonymously. Welcome credits can
-also still be farmed by clearing storage on first signup (before any linking),
-since `welcomeGranted` only guards wallet accounts.
+`functions/src/shared/rateLimit.ts` (generic, Firestore-backed) is now wired
+into `/api/auth/challenge` (per address), `/api/orders` create + claim (per
+uid), the AI generation routes (`/api/analyze-character`, `/api/generate-sheet`,
+`/api/generate-avatar`, `/api/generate-video`, `/api/gemini-token`, `/api/share`
+— keyed on uid when logged in, else IP via `app.set("trust proxy", true)`, one
+shared scope across all six so a script can't dodge the cap by spreading calls
+across routes), new-account creation on `/api/account/resolve` (per IP, only
+when a brand-new `users/{uid}` doc is about to be created — an existing user
+logging back in is never rate-limited), and `/api/credits/record-purchase`
+(per uid). The AI routes deliberately stay `requireUid`-free — that would
+remove the anonymous 5-free-renders flow, a product decision, not a gap.
 
-### 3. Don't lose a paid order on a failed claim
+Welcome credits are no longer farmable on the email/Google path either: the
+grant is now gated on Firebase's `email_verified` claim for the `email`
+provider (`nimiq`/`google` are unaffected — Google sign-in is pre-verified,
+and a wallet is already hard to mass-produce) — see
+`functions/src/credits/store.ts`'s `migrateBalance`.
 
-`claimServerOrder` is fire-and-forget (`src/core/credits.ts`) — HTTP status is
-never checked, so if the claim call fails *after* the user's on-chain payment
-succeeded, the order sits `pending` until the 30-minute TTL sweep and the credits
-never arrive. Needs a retry with backoff and a recovery path keyed on the tx hash.
+### 3. Don't lose a paid order on a failed claim — ✅ shipped
+
+`claimServerOrder` (`src/core/credits.ts`) now checks the response and throws
+instead of silently swallowing a failure. `runServerPurchase` retries the claim
+up to 4 times with backoff (1s/2s/4s); if every attempt still fails, the claim
+(`orderId`/`txHash`/`payerAddress`) is persisted to `localStorage`
+(`otherme:pending-claims`) and automatically retried on the next session
+restore, instead of being lost until the 30-minute TTL sweep silently expires
+the order.
+
+`recordPurchase` (the Phase-2 client-trusting purchase grant) is also hardened:
+it no longer trusts the client's `credits` number outright — a USDT amount is
+matched against a real pack via `findPack`, and a NIM credits value must equal
+one of the known bonus-adjusted pack tiers. Kept alive (not retired) for the
+`NIM_SERVER_VERIFIED` rollback path, but no longer an arbitrary-value grant.
 
 ### 4. Move saved work off the device — ✅ Stage 1 shipped, Stage 2/3 open
 
@@ -171,10 +190,6 @@ legal-accuracy call, not a translation one.
   audio file", not "record now". Dictation is the better path.
 - Real Node host for `server/api.ts` handlers (they only use fetch/env, so
   they're portable).
-- Single-source the pricing/treasury constants duplicated in `src/core/config.ts`
-  and `functions/src/config.ts` (each has its own "KEEP IN SYNC" comment today).
-  Real build-tooling work — the client is Vite-bundled, the server a separately
-  deployed Functions package — not a quick fix.
 
 Done since the last revision of this list: on-chain tx verification before
 granting credits, signed-challenge wallet login, production prices, automatic
@@ -186,5 +201,9 @@ avatars (item 4, Stage 1), a Spanish translation + EN/ES toggle for `/terms`
 contest/promo payouts, a UID-with-copy row on `/profile`, pinning
 `@nimiq/mini-app-sdk`, fixing the language-frozen login redirect notices,
 persisting the mic error to `sessionStorage` so `audio-check.html` can read
-it, and fixing linked accounts not actually sharing a session on wallet
-re-login (item 1's real-world completion).
+it, fixing linked accounts not actually sharing a session on wallet
+re-login (item 1's real-world completion), single-sourcing the pricing/
+treasury constants into `functions/src/sharedPricing.ts`, rotating the
+production treasury addresses off the pair that had been publicly labeled
+"test" in the repo's history, rate limiting across the previously-unbounded
+routes (item 2), and the order-claim retry/persistence fix (item 3).

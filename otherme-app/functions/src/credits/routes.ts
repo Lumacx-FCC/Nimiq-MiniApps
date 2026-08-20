@@ -9,8 +9,12 @@
  *   POST /api/credits/record-purchase { txHash, credits, method, amount }
  */
 import type { Request, Response } from "express";
-import { getAuthedUid } from "../auth/requireAuth.js";
+import { getAuthedClaims, getAuthedUid } from "../auth/requireAuth.js";
+import { checkRateLimit } from "../shared/rateLimit.js";
 import { getBalance, migrateBalance, recordPurchase, spend } from "./store.js";
+
+const RECORD_PURCHASE_LIMIT = 10;
+const RECORD_PURCHASE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 async function requireUid(req: Request, res: Response): Promise<string | null> {
   const uid = await getAuthedUid(req);
@@ -29,11 +33,13 @@ export async function handleBalance(req: Request, res: Response): Promise<void> 
 }
 
 export async function handleMigrate(req: Request, res: Response): Promise<void> {
-  const uid = await requireUid(req, res);
-  if (!uid)
+  const claims = await getAuthedClaims(req);
+  if (!claims) {
+    res.status(401).json({ error: "Not authenticated" });
     return;
+  }
   const localBalance = Number(req.body?.localBalance ?? 0);
-  res.status(200).json(await migrateBalance(uid, localBalance));
+  res.status(200).json(await migrateBalance(claims.uid, localBalance, claims.emailVerified));
 }
 
 export async function handleSpend(req: Request, res: Response): Promise<void> {
@@ -55,6 +61,11 @@ export async function handleRecordPurchase(req: Request, res: Response): Promise
   const uid = await requireUid(req, res);
   if (!uid)
     return;
+  const allowed = await checkRateLimit("record-purchase", uid, RECORD_PURCHASE_LIMIT, RECORD_PURCHASE_WINDOW_MS);
+  if (!allowed) {
+    res.status(429).json({ error: "Too many purchase records — try again later." });
+    return;
+  }
   const txHash = String(req.body?.txHash || "");
   const credits = Number(req.body?.credits);
   const method = String(req.body?.method || "");
@@ -64,5 +75,5 @@ export async function handleRecordPurchase(req: Request, res: Response): Promise
     return;
   }
   const result = await recordPurchase(uid, txHash, credits, method, amount);
-  res.status(200).json(result);
+  res.status("error" in result ? 400 : 200).json(result);
 }

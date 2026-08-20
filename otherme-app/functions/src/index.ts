@@ -13,16 +13,18 @@ import { onRequest } from "firebase-functions/https";
 import { onSchedule } from "firebase-functions/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions";
-import express, { type Request, type Response } from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { handleGrantCredits } from "./admin/routes.js";
 import { handleLinkCommit, handleLinkRedeemPreview, handleLinkStart, handleUnlink } from "./account/routes.js";
 import { handleAccountResolve, handleAuthChallenge, handleAuthVerify } from "./auth/routes.js";
+import { getAuthedUid } from "./auth/requireAuth.js";
 import { handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
 import { runReconcile } from "./reconciler/reconcile.js";
+import { checkRateLimit } from "./shared/rateLimit.js";
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
@@ -461,6 +463,27 @@ const wrap = (fn: (req: Request, res: Response) => Promise<void> | void) =>
   };
 
 const app = express();
+// Cloud Functions gen2 runs behind Google's front end — a trusted single hop —
+// so req.ip reflects the real caller IP (from X-Forwarded-For) instead of
+// Google's internal address. Needed for IP-keyed rate limiting below.
+app.set("trust proxy", true);
+
+/**
+ * Shared rate limit for the AI generation routes (anonymous-accessible by
+ * design — the 5-free-renders flow — so this bounds paid-API-quota abuse
+ * instead of gating on auth). One scope across all six routes so a script
+ * can't dodge the cap by spreading calls across them.
+ */
+async function aiRateLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const uid = await getAuthedUid(req);
+  const key = uid ? `uid:${uid}` : `ip:${req.ip}`;
+  const allowed = await checkRateLimit("ai-generate", key, 40, 10 * 60 * 1000);
+  if (!allowed) {
+    res.status(429).json({ error: "Too many requests — please slow down." });
+    return;
+  }
+  next();
+}
 
 // The production frontend calls this function cross-origin: Firebase Hosting
 // caps proxied calls at 60s, too short for image/video generation, so the app
@@ -481,12 +504,12 @@ app.use((req, res, next) => {
 const json = express.json({ limit: "25mb" });
 const router = express.Router();
 
-router.post("/analyze-character", json, wrap((req, res) => analyzeCharacter(req.body, res)));
-router.post("/generate-sheet", json, wrap((req, res) => generateSheet(req.body, res)));
-router.post("/generate-avatar", json, wrap((req, res) => generateAvatar(req.body, res)));
-router.post("/generate-video", json, wrap((req, res) => generateVideo(req.body, res)));
-router.post("/gemini-token", wrap((_req, res) => geminiToken(res)));
-router.post("/share", express.raw({ type: () => true, limit: "25mb" }), wrap(createShare));
+router.post("/analyze-character", json, aiRateLimit, wrap((req, res) => analyzeCharacter(req.body, res)));
+router.post("/generate-sheet", json, aiRateLimit, wrap((req, res) => generateSheet(req.body, res)));
+router.post("/generate-avatar", json, aiRateLimit, wrap((req, res) => generateAvatar(req.body, res)));
+router.post("/generate-video", json, aiRateLimit, wrap((req, res) => generateVideo(req.body, res)));
+router.post("/gemini-token", aiRateLimit, wrap((_req, res) => geminiToken(res)));
+router.post("/share", express.raw({ type: () => true, limit: "25mb" }), aiRateLimit, wrap(createShare));
 
 // Signed-challenge login (Nimiq Pay signs; server verifies). See auth/routes.ts.
 router.post("/auth/challenge", json, wrap(handleAuthChallenge));

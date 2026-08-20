@@ -10,6 +10,7 @@
  * verified uid (their NQ address) — never a client-supplied id.
  */
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { findPack, NIM_BONUS_MULTIPLIER, PACKS } from "../config.js";
 
 /** Starter credits for a brand-new ledger (mirrors client WELCOME_CREDITS). */
 export const WELCOME_CREDITS = 5;
@@ -80,8 +81,15 @@ export async function getBalance(address: string): Promise<BalanceView> {
  * initialized (welcomeGranted false), set the balance from the client's
  * reported localStorage balance (clamped), never below the welcome grant, and
  * lock it. Idempotent: once initialized, returns the current balance untouched.
+ *
+ * `eligible` gates the welcome-credit grant itself (Tier 1.3): an unverified
+ * email/password account is farmable (free, instant new Firebase uids), so
+ * when ineligible this leaves `welcomeGranted` false and grants nothing —
+ * the client's next migrate call (after the user verifies their email and the
+ * token refreshes) re-enters this same "never initialized" branch and grants
+ * normally. Never gate nimiq/google — see getAuthedClaims's doc comment.
  */
-export async function migrateBalance(address: string, localBalance: number): Promise<BalanceView> {
+export async function migrateBalance(address: string, localBalance: number, eligible = true): Promise<BalanceView> {
   const imported = Math.max(0, Math.min(Math.floor(Number.isFinite(localBalance) ? localBalance : 0), MAX_IMPORT));
   const seeded = Math.max(imported, WELCOME_CREDITS);
 
@@ -91,6 +99,8 @@ export async function migrateBalance(address: string, localBalance: number): Pro
     const data = snap.exists ? snap.data()! : {};
     if (data.welcomeGranted)
       return; // already initialized — no-op
+    if (!eligible)
+      return; // not yet eligible for the welcome grant — try again once verified
 
     tx.set(ref, {
       nimAddress: address,
@@ -134,20 +144,48 @@ export async function spend(address: string, amount: number, kind: string): Prom
 }
 
 /**
+ * Resolve how many credits a claimed purchase is actually worth, never the
+ * client's own `claimedCredits` number (Tier 1.5 — that was an unbounded
+ * arbitrary-value grant). USDT amounts are ~1:1 with USD, so `amount` matches
+ * a pack's `usd` directly via `findPack`. NIM amounts float with the live rate
+ * at payment time, which this endpoint has no record of, so a NIM claim can
+ * only be checked against the finite set of legitimate (pack, bonus) credit
+ * totals — not derived fresh, but bounded to a real pack size instead of an
+ * arbitrary integer.
+ */
+function resolvePurchaseCredits(method: string, amount: number, claimedCredits: number): number | null {
+  if (method === "usdt") {
+    const pack = findPack(amount);
+    return pack ? pack.credits : null;
+  }
+  if (method === "nim") {
+    const rounded = Math.round(claimedCredits);
+    const isKnownTier = PACKS.some(p => Math.round(p.credits * NIM_BONUS_MULTIPLIER) === rounded);
+    return isKnownTier ? rounded : null;
+  }
+  return null;
+}
+
+/**
  * Record a purchase and credit the balance. Idempotent by txHash (the ledger
  * entry doc id), so a replay can't double-grant.
  *
- * TEMPORARY (Phase 2): trusts the client-reported credits, same trust level as
- * the current MVP. Phase 4 replaces this with the on-chain reconciler.
+ * TEMPORARY (Phase 2): still trusts the client's claim that a payment
+ * happened at all (no on-chain check) — same trust level as the current MVP,
+ * kept alive for the NIM_SERVER_VERIFIED rollback path. Phase 4's reconciler
+ * is the verified path. What it no longer trusts is the *amount* — see
+ * resolvePurchaseCredits.
  */
 export async function recordPurchase(
   address: string,
   txHash: string,
-  credits: number,
+  claimedCredits: number,
   method: string,
   amount: number,
-): Promise<{ balance: number; alreadyRecorded: boolean }> {
-  const grant = Math.max(0, Math.floor(credits));
+): Promise<{ balance: number; alreadyRecorded: boolean } | { error: string }> {
+  const grant = resolvePurchaseCredits(method, amount, claimedCredits);
+  if (grant === null)
+    return { error: "Unrecognized pack for this method/amount" };
   const entryId = `tx-${txHash}`;
 
   return db().runTransaction(async (tx) => {

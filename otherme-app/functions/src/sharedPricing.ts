@@ -13,9 +13,10 @@
  * only removes the need to hand-copy the same numbers into two places.
  */
 
-// Team test treasury accounts (same as core-modules demo). Replace for production.
-export const NIM_TREASURY_ADDRESS = "NQ52 P5JM 7T15 VFSV 9G8S UEA1 7CRA JVAH U69F";
-export const EVM_TREASURY_ADDRESS = "0xdA5727CEb6bc093f22F6d56b75F5B3773Fbdf4D1";
+// Production treasury accounts — NIM and Polygon/USDT. Rotated 2026-08-19 off
+// the address that had been publicly labeled "test" in the repo's history.
+export const NIM_TREASURY_ADDRESS = "NQ45 G5KD DD93 5EJ5 EK0X CTSP 6NCJ FBJ1 BJ69";
+export const EVM_TREASURY_ADDRESS = "0x6b6dd19e222068EDdf799eE6fdCA163f14F57AAF";
 
 /**
  * PRODUCTION PRICES (live since 2026-07-27). `usd` is what we actually charge:

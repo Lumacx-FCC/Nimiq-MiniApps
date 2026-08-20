@@ -177,8 +177,10 @@ async function reconcilePurchase(record: PurchaseRecord): Promise<void> {
 
 // Sync whenever a wallet session appears (login) or is restored (reload).
 onSessionChange((address) => {
-  if (address)
+  if (address) {
     void syncFromServer()
+    void retryPendingClaims()
+  }
 })
 
 interface ServerOrder {
@@ -196,8 +198,89 @@ async function createServerOrder(method: 'nim' | 'usdt', packUsd: number): Promi
   return data as ServerOrder
 }
 
+/**
+ * Claim an order, surfacing a failed/unreachable server as a thrown error
+ * instead of silently swallowing it (the payment already broadcast on-chain
+ * by this point — a lost claim must not be mistaken for "nothing happened").
+ */
 async function claimServerOrder(orderId: string, txHash: string, payerAddress?: string): Promise<void> {
-  await authedFetch(`/api/orders/${orderId}/claim`, { txHash, payerAddress })
+  const data = await authedFetch(`/api/orders/${orderId}/claim`, { txHash, payerAddress })
+  if (!data?.ok)
+    throw new Error(data?.error || 'Could not confirm the payment with the server')
+}
+
+/* ------------------------------------------------------------------ */
+/* Unclaimed-order recovery (Tier 1.2)                                  */
+/*                                                                      */
+/* claimServerOrder can fail after a real on-chain payment (network      */
+/* blip, app killed before the call lands). Retry with backoff first;    */
+/* if that still fails, persist the claim so it survives a reload/relaunch */
+/* and gets retried on the next session restore instead of being lost.  */
+/* ------------------------------------------------------------------ */
+
+interface PendingClaim {
+  orderId: string
+  txHash: string
+  payerAddress?: string
+}
+
+const PENDING_CLAIMS_KEY = 'otherme:pending-claims'
+
+function readPendingClaims(): PendingClaim[] {
+  try {
+    const raw = localStorage.getItem(PENDING_CLAIMS_KEY)
+    return raw ? JSON.parse(raw) as PendingClaim[] : []
+  }
+  catch {
+    return []
+  }
+}
+
+function writePendingClaims(claims: PendingClaim[]): void {
+  localStorage.setItem(PENDING_CLAIMS_KEY, JSON.stringify(claims))
+}
+
+function addPendingClaim(claim: PendingClaim): void {
+  const claims = readPendingClaims().filter(c => c.orderId !== claim.orderId)
+  claims.push(claim)
+  writePendingClaims(claims)
+}
+
+function removePendingClaim(orderId: string): void {
+  writePendingClaims(readPendingClaims().filter(c => c.orderId !== orderId))
+}
+
+/** Retry any claims that never made it to the server on a previous session. */
+async function retryPendingClaims(): Promise<void> {
+  for (const claim of readPendingClaims()) {
+    try {
+      await claimServerOrder(claim.orderId, claim.txHash, claim.payerAddress)
+      removePendingClaim(claim.orderId)
+    }
+    catch {
+      // Still unreachable — leave it for the next session restore.
+    }
+  }
+}
+
+/** Claim with a few retries (the payment already broadcast, so a transient
+ * failure here must not be treated as a lost purchase); persists the claim
+ * for later recovery if every attempt fails. */
+async function claimWithRetry(orderId: string, txHash: string, payerAddress?: string): Promise<void> {
+  const attempts = 4
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await claimServerOrder(orderId, txHash, payerAddress)
+      return
+    }
+    catch (e) {
+      if (attempt === attempts - 1) {
+        addPendingClaim({ orderId, txHash, payerAddress })
+        throw e
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000 * 2 ** attempt)) // 1s, 2s, 4s
+    }
+  }
 }
 
 /**
@@ -342,7 +425,16 @@ async function runServerPurchase(method: 'usdt' | 'nim', pack: CreditPack): Prom
     }
 
     setFlow({ status: 'submitted', orderId: order.orderId, txHash })
-    await claimServerOrder(order.orderId, txHash, payerAddress)
+    try {
+      await claimWithRetry(order.orderId, txHash, payerAddress)
+    }
+    catch {
+      // The payment already broadcast on-chain — this is NOT a failed
+      // purchase, just an unconfirmed claim. It's persisted (pending-claims)
+      // and will retry on the next session restore; keep watching this order
+      // in case a same-session retry (or a later reload) still lands.
+      setFlow({ error: 'Payment sent — confirming with the server may take a bit longer than usual.' })
+    }
     setFlow({ status: 'confirming' })
     watchOrder(order.orderId)
     return true
