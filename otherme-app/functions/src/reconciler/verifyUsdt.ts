@@ -11,7 +11,6 @@ import type { OrderWithId } from "../orders/store.js";
 import {
   CONFIRMATIONS_USDT,
   ERC20_TRANSFER_TOPIC,
-  EVM_TREASURY_ADDRESS,
   USDT_POLYGON_CONTRACT,
 } from "../config.js";
 import { jsonRpc } from "./rpc.js";
@@ -46,7 +45,13 @@ export async function verifyUsdt(order: OrderWithId, rpcUrl: string): Promise<Ve
   if (receipt.status !== "0x1")
     return { state: "mismatch", reason: "transaction reverted" };
 
-  const treasury = EVM_TREASURY_ADDRESS.toLowerCase();
+  // Compare against the order's own frozen recipient, not the live config —
+  // a treasury rotation must not strand in-flight orders that legitimately
+  // paid whatever address was current when the order was created (real
+  // incident, 20 Aug 2026: rotating EVM_TREASURY_ADDRESS mid-flight made a
+  // genuinely-paid order unverifiable forever, since this used to re-read
+  // the current config value here instead of the order's own snapshot).
+  const treasury = order.expectedRecipient.toLowerCase();
   const payer = order.payerAddress.toLowerCase();
   const expected = BigInt(order.expectedBaseUnits);
 
