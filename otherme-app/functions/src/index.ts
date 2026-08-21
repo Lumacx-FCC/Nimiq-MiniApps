@@ -23,11 +23,13 @@ import { handleAccountResolve, handleAuthChallenge, handleAuthVerify } from "./a
 import { getAuthedUid } from "./auth/requireAuth.js";
 import { handleAcceptTerms, handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
+import { handlePaypalWebhook } from "./paypal/webhook.js";
 import { runReconcile } from "./reconciler/reconcile.js";
 import { checkRateLimit } from "./shared/rateLimit.js";
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+const PAYPAL_CLIENT_SECRET = defineSecret("PAYPAL_CLIENT_SECRET");
 
 // Phase 4 reconciler RPC config, read from process.env at runtime. A secret is
 // only injected into process.env when it's listed in the schedule's `secrets`
@@ -537,6 +539,10 @@ router.post("/credits/accept-terms", json, wrap(handleAcceptTerms));
 router.post("/orders", json, wrap(handleCreateOrder));
 router.post("/orders/:id/claim", json, wrap(handleClaimOrder));
 
+// Incoming PayPal webhook (backlog 4.7 Part B) — no auth middleware, PayPal
+// calls this directly; the signature check inside IS the auth. See paypal/webhook.ts.
+router.post("/paypal/webhook", json, wrap((req, res) => handlePaypalWebhook(req, res, PAYPAL_CLIENT_SECRET.value())));
+
 // Admin-only credit grants (contest prizes, support credits). See admin/routes.ts.
 router.post("/admin/grant-credits", json, wrap(handleGrantCredits));
 
@@ -551,7 +557,7 @@ export const api = onRequest(
   {
     memory: "1GiB",
     timeoutSeconds: 540,
-    secrets: [GEMINI_API_KEY, OPENAI_API_KEY],
+    secrets: [GEMINI_API_KEY, OPENAI_API_KEY, PAYPAL_CLIENT_SECRET],
   },
   app,
 );

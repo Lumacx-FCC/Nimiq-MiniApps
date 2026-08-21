@@ -11,7 +11,7 @@ import { isPaypalEnabled, renderHostedButton } from '@core/credits/payPaypal'
 import { useSettings } from '../app/providers'
 import { checkEmailVerified, resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
-import { acceptTerms, createServerOrder, useCredits } from '../core/credits'
+import { acceptTerms, createServerOrder, useCredits, watchPaypalOrder } from '../core/credits'
 import { getAccountOverview } from '../core/accountLink'
 import { PAYPAL_PACKS, REGULAR_USD } from '../core/config'
 import AppHeader from '../components/AppHeader'
@@ -37,8 +37,8 @@ const COPY = {
     newToNimiq: 'New on Nimiq?',
     getNimiqPay: 'Get Nimiq Pay App',
     openTip: 'Open this app’s URL inside the Nimiq Pay app to add credits.',
-    history: 'Purchases',
-    empty: 'No purchases yet.',
+    history: 'Credits History',
+    empty: 'No credits history yet.',
     logout: 'Log out',
     loginNeeded: 'Log in to buy and use credits.',
     accountScope: 'Credits stay with the sign-in method you buy them with by default. To use the same balance elsewhere, sign in the same way, or link another login from your Profile page.',
@@ -56,17 +56,25 @@ const COPY = {
     termsGateError: 'Could not confirm — try again in a moment.',
     navNim: 'Buy Credits with NIM',
     navCard: 'Buy Credits with Card',
-    navHistory: 'Show Purchases',
+    navHistory: 'Credits History',
     payCardBanner: 'Prefer to pay with a card?',
     payCardTitle: 'Pay with Credit Card',
     nimiqBonusBanner: 'Get 50% more credits using Nimiq Pay',
     choosePackage: 'Choose a package',
     checkoutTitle: 'Complete your purchase',
     changePackage: 'Choose a different package',
+    preparingCheckout: 'Preparing checkout…',
+    checkoutPrepFailed: 'Could not prepare checkout — please try again before paying.',
+    retry: 'Retry',
     noWalletNotice: 'No wallet linked yet — please download the Nimiq Pay app and link your accounts first.',
     noEmailNotice: 'A verified email is needed before using Credit Card payments — log out and sign in with Gmail/Email, then link your accounts from the Profile tab.',
     linkEmailNotice: 'To pay with a card, sign in with an email or Google account — link one from your Profile page first if you don’t have one yet.',
     noticeOk: 'Got it',
+    historyWelcome: 'Welcome credits',
+    historyMigrate: 'Imported balance',
+    historyLinkMerge: 'Account link merge',
+    historyPromo: 'Promo grant',
+    historySpend: 'Spent',
   },
   es: {
     balance: 'Tus créditos',
@@ -86,8 +94,8 @@ const COPY = {
     newToNimiq: '¿Nuevo en Nimiq?',
     getNimiqPay: 'Descargar Nimiq Pay',
     openTip: 'Abre la URL de esta app dentro de Nimiq Pay para añadir créditos.',
-    history: 'Compras',
-    empty: 'Aún no hay compras.',
+    history: 'Historial de créditos',
+    empty: 'Aún no hay historial de créditos.',
     logout: 'Cerrar sesión',
     loginNeeded: 'Inicia sesión para comprar y usar créditos.',
     accountScope: 'Los créditos quedan ligados al método con el que los compras por defecto. Para usar el mismo saldo en otro lugar, inicia sesión de la misma forma, o vincula otro inicio de sesión desde tu perfil.',
@@ -105,17 +113,25 @@ const COPY = {
     termsGateError: 'No pudimos confirmar — intenta de nuevo en un momento.',
     navNim: 'Comprar créditos con NIM',
     navCard: 'Comprar créditos con Tarjeta',
-    navHistory: 'Ver compras',
+    navHistory: 'Historial de créditos',
     payCardBanner: '¿Prefieres pagar con tarjeta?',
     payCardTitle: 'Pagar con Tarjeta',
     nimiqBonusBanner: 'Obtén 50% más créditos con Nimiq Pay',
     choosePackage: 'Elige un paquete',
     checkoutTitle: 'Completa tu compra',
     changePackage: 'Elegir otro paquete',
+    preparingCheckout: 'Preparando el pago…',
+    checkoutPrepFailed: 'No pudimos preparar el pago — intenta de nuevo antes de pagar.',
+    retry: 'Reintentar',
     noWalletNotice: 'Aún no tienes un monedero vinculado — descarga la app Nimiq Pay y vincula tus cuentas primero.',
     noEmailNotice: 'Necesitas un email verificado para usar pagos con tarjeta — cierra sesión e inicia sesión con Gmail/Email, luego vincula tus cuentas desde la pestaña Perfil.',
     linkEmailNotice: 'Para pagar con tarjeta, inicia sesión con una cuenta de email o Google — vincula una desde tu perfil si aún no tienes.',
     noticeOk: 'Entendido',
+    historyWelcome: 'Créditos de bienvenida',
+    historyMigrate: 'Saldo importado',
+    historyLinkMerge: 'Fusión de cuentas vinculadas',
+    historyPromo: 'Crédito promocional',
+    historySpend: 'Gastado',
   },
 } as const
 
@@ -154,20 +170,71 @@ const PAY_COPY = {
 
 /**
  * Package grid + live PayPal Hosted Button checkout (backlog 4.7 Part A).
- * Selecting a pack renders that pack's real Hosted Button (Lucas's PayPal
- * dashboard snippet) and fires an audit-trail server order — Part B's
- * (not yet built) webhook grants credits by matching the payer's email
- * against this order, with a manual-grant fallback for anything unmatched.
+ * Selecting a pack fires an audit-trail server order first — Part B's
+ * webhook grants credits by matching the payer's email against it, with a
+ * manual-grant fallback for anything unmatched. The Hosted Button (the only
+ * way to actually pay) only renders once that order is confirmed to exist —
+ * a real production test found that rendering it unconditionally let a real
+ * payment go through with nothing server-side to match it against, since the
+ * button itself never depends on our server at all.
  */
 function PaypalPackageSelector({ t }: { t: typeof COPY['en'] | typeof COPY['es'] }) {
   const [selected, setSelected] = useState<typeof PAYPAL_PACKS[number] | null>(null)
+  const [orderState, setOrderState] = useState<'creating' | 'ready' | 'error' | 'needsTerms'>('creating')
+  const [orderError, setOrderError] = useState<string | null>(null)
+  const [termsChecked, setTermsChecked] = useState(false)
+  const [termsBusy, setTermsBusy] = useState(false)
 
-  useEffect(() => {
+  const prepareCheckout = async (pack: typeof PAYPAL_PACKS[number]) => {
+    setOrderState('creating')
+    setOrderError(null)
+    try {
+      const order = await createServerOrder('paypal', pack.usd)
+      watchPaypalOrder(order.orderId)
+      setOrderState('ready')
+    }
+    catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      // The NIM/USDT flow already gates on this via Credits.tsx's own terms
+      // modal (startBuy/confirmTermsAndBuy) — PayPal package selection calls
+      // createServerOrder directly and never went through it, so an account
+      // that only ever received admin-granted credits (never a real NIM/USDT
+      // purchase) hits this for the first time here. Same checkpoint, shown
+      // inline instead of reusing that modal (this component has no access
+      // to its state without threading props through).
+      if (message === 'Terms not accepted') {
+        setOrderState('needsTerms')
+        return
+      }
+      setOrderError(message)
+      setOrderState('error')
+    }
+  }
+
+  const confirmTermsAndRetry = async () => {
     if (!selected)
       return
-    void renderHostedButton(selected.hostedButtonId, `paypal-container-${selected.hostedButtonId}`)
-    void createServerOrder('paypal', selected.usd).catch(() => {})
+    setTermsBusy(true)
+    const ok = await acceptTerms().catch(() => false)
+    setTermsBusy(false)
+    if (ok) {
+      void prepareCheckout(selected)
+    }
+    else {
+      setOrderError(t.termsGateError)
+      setOrderState('error')
+    }
+  }
+
+  useEffect(() => {
+    if (selected)
+      void prepareCheckout(selected)
   }, [selected])
+
+  useEffect(() => {
+    if (selected && orderState === 'ready')
+      void renderHostedButton(selected.hostedButtonId, `paypal-container-${selected.hostedButtonId}`)
+  }, [selected, orderState])
 
   return (
     <div className="om-card mb-4">
@@ -186,8 +253,43 @@ function PaypalPackageSelector({ t }: { t: typeof COPY['en'] | typeof COPY['es']
       </div>
       {selected && (
         <div className="mt-4">
-          <h3 className="text-sm font-extrabold mb-2">{t.checkoutTitle}</h3>
-          <div id={`paypal-container-${selected.hostedButtonId}`} />
+          {orderState === 'creating' && (
+            <p className="text-sm text-center" style={{ color: 'var(--text-60)' }}>{t.preparingCheckout}</p>
+          )}
+          {orderState === 'needsTerms' && (
+            <div className="text-center">
+              <p className="text-sm mb-2" style={{ color: 'var(--text-60)' }}>{t.termsGateBody}</p>
+              <a href="/terms" target="_blank" rel="noreferrer" className="text-sm font-semibold" style={{ color: 'var(--nimiq-light-blue)' }}>
+                {t.termsGateLink}
+              </a>
+              <label className="flex items-center gap-2 mt-3 mb-3 text-sm text-left cursor-pointer">
+                <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)} />
+                {t.termsGateCheckbox}
+              </label>
+              <button
+                className="om-button gold w-full !text-xs !min-h-[36px]"
+                disabled={!termsChecked || termsBusy}
+                onClick={() => void confirmTermsAndRetry()}
+              >
+                {t.termsGateConfirm}
+              </button>
+            </div>
+          )}
+          {orderState === 'error' && (
+            <div className="text-center">
+              <p className="text-sm mb-1" style={{ color: 'var(--nimiq-red)' }}>{t.checkoutPrepFailed}</p>
+              {orderError && <p className="text-xs mb-2" style={{ color: 'var(--text-40)' }}>{orderError}</p>}
+              <button className="om-button secondary !text-xs !min-h-[36px]" onClick={() => void prepareCheckout(selected)}>
+                {t.retry}
+              </button>
+            </div>
+          )}
+          {orderState === 'ready' && (
+            <>
+              <h3 className="text-sm font-extrabold mb-2">{t.checkoutTitle}</h3>
+              <div id={`paypal-container-${selected.hostedButtonId}`} />
+            </>
+          )}
           <button className="om-button secondary w-full mt-3 !text-xs !min-h-[36px]" onClick={() => setSelected(null)}>
             {t.changePackage}
           </button>
@@ -229,6 +331,23 @@ function NewOnNimiqCard({ t }: { t: typeof COPY['en'] | typeof COPY['es'] }) {
       </p>
     </div>
   )
+}
+
+/** Human label for a Credits History row — a purchase shows amount+method
+ * (unchanged), every other ledger kind (welcome/migrate/promo/link-merge/
+ * spend) gets a translated label, falling back to the server's own note
+ * text for anything unrecognized rather than showing nothing. */
+function historyLabel(record: { method?: string, kind?: string, amount: number, note?: string }, t: typeof COPY['en'] | typeof COPY['es']): string {
+  if (record.method)
+    return `${record.amount} ${record.method.toUpperCase()}`
+  switch (record.kind) {
+    case 'welcome': return t.historyWelcome
+    case 'migrate': return t.historyMigrate
+    case 'link-merge': return t.historyLinkMerge
+    case 'promo': return record.note || t.historyPromo
+    case 'spend': return record.note ? `${t.historySpend} · ${record.note}` : t.historySpend
+    default: return record.note || record.kind || ''
+  }
 }
 
 export default function Credits() {
@@ -627,9 +746,11 @@ export default function Credits() {
         <h2 className="text-lg font-extrabold mb-3 flex items-center gap-2"><History size={18} />{t.history}</h2>
         {!history.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
         {history.map(record => (
-          <div key={record.txHash + record.at} className="flex items-center justify-between py-2 text-sm" style={{ borderBottom: '1px solid var(--highlight-bg)' }}>
-            <span className="font-bold">+{record.credits}</span>
-            <span style={{ color: 'var(--text-60)' }}>{record.amount} {record.method.toUpperCase()}</span>
+          <div key={(record.txHash || record.kind || '') + record.at} className="flex items-center justify-between py-2 text-sm" style={{ borderBottom: '1px solid var(--highlight-bg)' }}>
+            <span className="font-bold" style={{ color: record.credits < 0 ? 'var(--nimiq-red)' : undefined }}>
+              {record.credits > 0 ? '+' : ''}{record.credits}
+            </span>
+            <span style={{ color: 'var(--text-60)' }}>{historyLabel(record, t)}</span>
             <span style={{ color: 'var(--text-40)' }}>{new Date(record.at).toLocaleDateString()}</span>
           </div>
         ))}

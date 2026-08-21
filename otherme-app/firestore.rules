@@ -57,6 +57,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // PayPal webhook events that couldn't be confidently matched to an
+    // account (backlog 4.7 Part B) — server-only, reviewed manually.
+    match /paypal_unmatched_events/{eventId} {
+      allow read, write: if false;
+    }
+
     // Cloud-synced character sheets and custom avatars (Part C Stage 1).
     // Client SDK writes directly (no money at stake, unlike the ledger above).
     // create/update check the incoming doc's uid; read/delete check the

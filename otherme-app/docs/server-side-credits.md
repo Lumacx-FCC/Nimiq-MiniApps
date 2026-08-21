@@ -523,36 +523,34 @@ const PAY_COPY_ES = {
 
 Phases 1–5 were deliberately **wallet-anchored**: identity proven by a Nimiq
 signature, credits bought with NIM/USDT inside Nimiq Pay. The items below were
-originally scoped as a separate, later browser-distribution workstream — two
-have since shipped as part of Phase 6 (18 Aug) and today's PayPal scope call
-(20 Aug), so this section is now a historical record plus one open item.
+originally scoped as a separate, later browser-distribution workstream — both
+have since shipped (Phase 6, 18 Aug; PayPal, 20–21 Aug), so this section is
+now purely a historical record.
 
 - ✅ **Email/Google users — SHIPPED (Phase 6, 18 Aug).** No longer demo-only:
   real Firebase Auth (`createUserWithEmailAndPassword`/`signInWithPopup`),
   server-verified, with their own server ledger (same shape as wallet users)
   and account linking to fold a wallet/email/Google identity together. See
   `otherme-backlog-plan` memory / this file's own Phase 6 references.
-- **PayPal payments — Part A (real checkout) shipped and confirmed
-  live-tested 20–21 Aug, Part B (crediting) still open.** Scope resolved
-  directly by Lucas: not restricted to a separate browser-distributed build —
-  `paypalEnabled: true` for otherme-app, with a runtime gate in `Credits.tsx`
-  (`user.provider !== 'nimiq'`) hiding Card mode for wallet sign-ins and
-  showing it for email/Google, since this targets full production rather
-  than the (already-closed) competition rule. Real PayPal Hosted Buttons
-  checkout renders for 3 fixed-price packages (priced off a new
-  `REGULAR_PACKS`, no early-bird discount); two navigation guards (no linked
-  wallet, unverified email) gate access to each mode, with the
-  email-verification guard using a live Firebase re-check (pessimistic
-  default) after an initial cut using a stale client flag let an unverified
-  account through briefly. `functions/src/orders/store.ts`'s `OrderMethod`
-  recognizes `"paypal"` and the reconciler explicitly skips it (no
-  capture-verification analog exists yet). Still needed before Part B is
-  real: Lucas creating a webhook in the PayPal Developer Dashboard + getting
-  the client secret into Secret Manager, then the create/capture order flow
-  against PayPal's REST API and the capture-verification "reconciler" analog
-  (no on-chain tx hash exists for PayPal — needs a webhook or a server-side
-  poll against PayPal's Orders API).
-- Net effect once PayPal's real wiring lands: two parallel secured cohorts —
-  wallet users (NIM/USDT, on-chain verified) and email/Google users (PayPal
-  capture-verified) — sharing the same server ledger, both reachable from the
-  same build.
+- ✅ **PayPal payments — SHIPPED & CONFIRMED, both Part A and Part B, 20–21
+  Aug.** Scope resolved directly by Lucas: not restricted to a separate
+  browser-distributed build — `paypalEnabled: true` for otherme-app, with a
+  runtime gate in `Credits.tsx` (`user.provider !== 'nimiq'`) hiding Card
+  mode for wallet sign-ins and showing it for email/Google. Real PayPal
+  Hosted Buttons checkout for 3 fixed-price packages (priced off
+  `REGULAR_PACKS`, no early-bird discount), gated behind a confirmed
+  server-side order; `functions/src/paypal/` (OAuth token, webhook signature
+  verification, payer-email-match grant) credits the balance via the same
+  atomic `claimOrder`/`grantOrder` path NIM/USDT use. Hosted Buttons
+  transactions turned out to route through a separate, auto-provisioned "NVP
+  SOAP Webhooks" app rather than either visible REST app — a real
+  infrastructure surprise found by testing, not documented anywhere in
+  PayPal's own dashboard copy. Four real bugs found and fixed live-testing
+  (stale-default email-verification check, order-creation not gating the Pay
+  button, a missing terms-acceptance checkpoint for PayPal, and "Credits
+  History" not reading server-side ledger history) — full account in
+  `server-side-credits-migration` memory, Phase 12. Confirmed by Lucas: real
+  test purchases auto-grant correctly end to end.
+- Net effect: two parallel secured cohorts — wallet users (NIM/USDT,
+  on-chain verified) and email/Google users (PayPal capture-verified) —
+  sharing the same server ledger, both reachable from the same build.

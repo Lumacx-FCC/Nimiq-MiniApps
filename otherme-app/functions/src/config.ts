@@ -65,6 +65,34 @@ export const RECONCILE_BATCH = 25;
 /** App id used in the NIM transaction data tag (`<appId>:<orderId>`). */
 export const APP_ID = "otherme";
 
+/* ------------------------------------------------------------------ */
+/* Backlog 4.7 Part B — PayPal webhook crediting                       */
+/* ------------------------------------------------------------------ */
+
+export const PAYPAL_API_BASE = "https://api-m.paypal.com";
+/**
+ * "NVP SOAP Webhooks" app in the PayPal Developer Dashboard (Live) — used for
+ * server-side API calls (OAuth, webhook signature verification, order
+ * lookups). NOT the same client ID the Hosted Buttons script uses on the
+ * client (that one belongs to PayPal's own managed Buttons product, not a
+ * REST app we control).
+ *
+ * Confirmed live (21 Aug 2026): Hosted Buttons transactions do NOT report to
+ * either of the two REST apps under "Apps & Credentials" (OtherMeApp,
+ * Activation_App) — a real $1 test purchase produced zero webhook events on
+ * both. They report to this separate, auto-provisioned "NVP SOAP Webhooks"
+ * app instead (under API Credentials -> NVP/SOAP API apps -> Manage
+ * Webhooks) — evidently Hosted/PayPal Buttons still route through the
+ * classic NVP-linked account path even though the checkout UI itself is
+ * modern. This app's secret (PAYPAL_CLIENT_SECRET, Secret Manager) pairs
+ * with this client ID. Public, safe to commit.
+ */
+export const PAYPAL_APP_CLIENT_ID = "BAAeSk62kE4oRkcBtMPYw7CCiaKE9ZJz4MdOiAt-_ezjJLZ6PE5NdPYMg4UnXj_2u0DF2i67lNKdB94IY8";
+/** Webhook ID from that same app's Webhooks section — required to verify an
+ * incoming webhook's signature. Not secret (it doesn't let anyone forge a
+ * valid signature on its own), safe to commit. */
+export const PAYPAL_WEBHOOK_ID = "8MR134083R422942J";
+
 export function findPack(usd: number, list: readonly { usd: number; credits: number }[] = PACKS): { usd: number; credits: number } | null {
   return list.find(p => Math.abs(p.usd - usd) < 1e-9) ?? null;
 }

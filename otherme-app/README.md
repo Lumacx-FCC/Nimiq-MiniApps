@@ -207,38 +207,54 @@ legal-accuracy call, not a translation one.
 - Real Node host for `server/api.ts` handlers (they only use fetch/env, so
   they're portable).
 
-### 9. PayPal for non-wallet users — ✅ Part A (checkout) shipped, Part B (crediting) open
+### 9. PayPal for non-wallet users — ✅ SHIPPED & CONFIRMED (Parts A + B)
 
 Scope resolved directly by Lucas (20 Aug): PayPal checkout should be
 **hidden for wallet sign-ins and shown for any non-wallet sign-in (email or
 Google)** — a runtime gate on `user.provider`, not a separate build, since
 this targets full production rather than the (already-closed) competition.
 
-**Part A — real checkout, shipped and confirmed live-tested.** The Credits
-page (`Credits.tsx`) is now a nav-driven toggle: nothing shows below the
-balance card until "Buy Credits with NIM" / "Buy Credits with Card" / "Show
-Purchases" is clicked, with nudge banners letting a user swap between NIM and
-Card modes. Selecting one of 3 package images renders that pack's real
-PayPal Hosted Button (`core-modules/.../payPaypal.ts`'s `renderHostedButton`,
-a script-loader mirroring `googleAuth.ts`'s `loadGis()`) and fires an
-audit-trail server order (`OrderMethod` recognizes `"paypal"`, priced off a
-new `REGULAR_PACKS` since Card packages don't get the early-bird discount).
-Two navigation guards, added after live-testing surfaced real gaps: no
-linked wallet → guided to `/profile` instead of Top Up; unverified email (or
-a wallet-signed-in user with no active email identity) → guided via a popup
-instead of entering Card mode. The email-verification check went through one
-real bug fix — the first cut trusted a client flag that defaulted to
-"verified" before the server round-trip landed, letting an unverified email
-slip through briefly; fixed with a live Firebase re-check, pessimistic by
-default.
+**Part A — real checkout.** The Credits page (`Credits.tsx`) is a nav-driven
+toggle: nothing shows below the balance card until "Buy Credits with NIM" /
+"Buy Credits with Card" / "Credits History" is clicked, with nudge banners
+letting a user swap between NIM and Card modes. Selecting one of 3 package
+images renders that pack's real PayPal Hosted Button
+(`core-modules/.../payPaypal.ts`'s `renderHostedButton`, a script-loader
+mirroring `googleAuth.ts`'s `loadGis()`) only after an audit-trail server
+order is confirmed created (`OrderMethod` recognizes `"paypal"`, priced off a
+`REGULAR_PACKS` since Card packages don't get the early-bird discount) —
+rendering it unconditionally was the first cut, until a real test proved a
+payment could go through with nothing server-side to match it against.
+Navigation guards: no linked wallet → guided to `/profile` instead of Top
+Up; unverified email (or a wallet-signed-in user with no active email
+identity) → guided via a popup instead of entering Card mode.
 
-**Part B — still open, blocked on Lucas**: real payments succeed today but
-nothing auto-credits the balance yet. Needs the actual create/capture order
-flow against PayPal's REST API and a capture-verification "reconciler"
-analog (no on-chain tx hash exists for PayPal — needs a webhook or a
-server-side poll) — none of this can be built usefully until Lucas creates a
-webhook in the PayPal Developer Dashboard and gets the client secret into
-Secret Manager.
+**Part B — server-side crediting, via `functions/src/paypal/`**: an OAuth2
+token helper, webhook signature verification, and a payer-email-match grant
+reusing the same atomic `claimOrder`/`grantOrder` path NIM/USDT use. A real
+webhook-routing surprise: Hosted Buttons transactions report through a
+separate, auto-provisioned **"NVP SOAP Webhooks"** app in the PayPal
+dashboard, not either visible REST app under "Apps & Credentials" — found
+after two dead-end registrations showed zero events. Unmatched payments log
+to `paypal_unmatched_events` for a manual grant via `/promos_management`
+rather than being guessed.
+
+**Confirmed live**: multiple real PayPal test purchases auto-granted the
+correct credits end to end, visible immediately in Credits History (which
+itself went through a real fix — see item 10 below).
+
+### 10. "Purchases" showed nothing for server-verified buys — ✅ fixed
+
+Found while confirming a PayPal grant: `getBalance`
+(`functions/src/credits/store.ts`) has always returned the last 25 ledger
+entries on every `/api/credits/balance`/`/api/credits/migrate` response —
+this was true for NIM/USDT too, just never read client-side. `adoptServerBalance`
+(`src/core/credits.ts`) now maps that `history` field into local state, which
+retroactively surfaced every past purchase (including 3 real PayPal ones)
+with zero backfill needed — the ledger entries were already correct, only
+the read was missing. Renamed "Purchases" → "Credits History" and broadened
+it to show every ledger kind (welcome/migrate/promo/spend/link-merge), not
+just purchases, sorted newest-first.
 
 Done since the last revision of this list: on-chain tx verification before
 granting credits, signed-challenge wallet login, production prices, automatic
@@ -258,5 +274,6 @@ production treasury addresses off the pair that had been publicly labeled
 routes (item 2), the order-claim retry/persistence fix (item 3), cloud sync
 for scenes and videos (item 4, Stage 2/3), the cross-device reference-image
 fix + Storage bucket CORS config that shipping Stage 2/3 surfaced, the
-Credits page's nav-driven toggle redesign with real PayPal Hosted Buttons
-checkout and its two navigation guards (item 9, Part A).
+Credits page's nav-driven toggle redesign with real PayPal checkout and
+server-side webhook crediting (item 9, Parts A + B — 4.7 fully closed), and
+the server-side purchase history the client was never reading (item 10).

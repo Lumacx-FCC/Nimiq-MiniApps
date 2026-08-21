@@ -19,9 +19,18 @@ import { createStore, useStore } from './store'
 
 export interface PurchaseRecord {
   txHash: string
-  method: 'usdt' | 'nim'
+  /** Only present for a purchase entry (welcome/migrate/spend/promo/link-merge
+   * entries have none). */
+  method?: 'usdt' | 'nim' | 'paypal'
+  /** Ledger kind — 'purchase' when absent, for the legacy client-trust path's
+   * records (those are always purchases; only server-derived entries via
+   * mapLedgerHistory set this for the other kinds). */
+  kind?: string
+  /** Signed delta — negative for a spend. */
   credits: number
   amount: number
+  /** The server ledger's free-text note, shown for non-purchase kinds. */
+  note?: string
   at: string
 }
 
@@ -145,6 +154,44 @@ async function authedFetch(path: string, body?: unknown): Promise<any | null> {
   return res.json().catch(() => null)
 }
 
+interface ServerLedgerEntry {
+  delta: number
+  kind: string
+  at: number
+  txHash?: string
+  method?: string
+  note?: string
+}
+
+/**
+ * getBalance (functions/src/credits/store.ts) already returns the last 25
+ * ledger entries on every /api/credits/balance and /api/credits/migrate
+ * response — this was always there, just never read client-side, which is
+ * why "Credits History" stayed empty for any server-verified buy (NIM/USDT/
+ * PayPal) that didn't happen to still have the exact in-memory session that
+ * granted it (e.g. PayPal's Hosted Buttons checkout navigates away and back,
+ * remounting the page fresh). Every kind surfaces (purchase/welcome/migrate/
+ * spend/promo/link-merge), sorted newest first regardless of the order the
+ * server returned. `amount` isn't a stored field on the ledger entry, but
+ * every purchase note is written as `"<amount> <method>[...]"`
+ * (grantOrder/recordPurchase), so a leading parseFloat reliably recovers it
+ * for that kind without needing a server-side change; other kinds have no
+ * meaningful "amount paid" and get 0.
+ */
+function mapLedgerHistory(entries: ServerLedgerEntry[]): PurchaseRecord[] {
+  return entries
+    .map(e => ({
+      txHash: e.txHash || '',
+      method: e.method as PurchaseRecord['method'],
+      kind: e.kind,
+      credits: e.delta,
+      amount: e.kind === 'purchase' ? (parseFloat(e.note || '0') || 0) : 0,
+      note: e.note,
+      at: new Date(e.at).toISOString(),
+    }))
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+}
+
 /** Adopt the server's authoritative balance into the local cache. */
 function adoptServerBalance(data: any | null): void {
   if (data && typeof data.balance === 'number') {
@@ -155,6 +202,7 @@ function adoptServerBalance(data: any | null): void {
       // doesn't) — only overwrite when actually present.
       emailVerificationPending: typeof data.emailVerificationPending === 'boolean' ? data.emailVerificationPending : s.emailVerificationPending,
       termsAccepted: typeof data.termsAccepted === 'boolean' ? data.termsAccepted : s.termsAccepted,
+      history: Array.isArray(data.history) ? mapLedgerHistory(data.history) : s.history,
     }))
     persist()
   }
@@ -443,17 +491,11 @@ function watchOrder(orderId: string): void {
       const status = (snap.data() as { status?: string } | undefined)?.status
       if (status === 'granted') {
         stopWatch()
+        // adoptServerBalance now also adopts history from this same response
+        // (getBalance's ledger read) — no need to construct a PurchaseRecord
+        // locally any more.
         void authedFetch('/api/credits/balance').then(adoptServerBalance)
-        creditsStore.update((s) => {
-          const rec: PurchaseRecord = {
-            txHash: s.flow.txHash || '',
-            method: s.flow.method || 'usdt',
-            credits: s.flow.credits || 0,
-            amount: s.flow.amount || 0,
-            at: new Date().toISOString(),
-          }
-          return { ...s, isPaying: false, history: [rec, ...s.history].slice(0, 20), flow: { ...s.flow, status: 'granted' } }
-        })
+        creditsStore.update(s => ({ ...s, isPaying: false, flow: { ...s.flow, status: 'granted' } }))
       }
       else if (status === 'failed' || status === 'expired') {
         stopWatch()
@@ -461,6 +503,39 @@ function watchOrder(orderId: string): void {
       }
     },
     () => { /* snapshot error (offline/rules) — leave the flow; user can dismiss/retry */ },
+  )
+}
+
+let paypalOrderUnsub: (() => void) | null = null
+
+/**
+ * Watch a PayPal order doc (backlog 4.7 Part B) for the webhook's grant —
+ * deliberately independent of watchOrder/flow above: PayPal's own hosted UI
+ * already handles the payment experience, so there's no confirming-payment
+ * modal to drive here, just an instant balance/history refresh instead of
+ * only catching up on the next reload. Best-effort only: Hosted Buttons
+ * navigates away to paypal.com and back, which usually remounts the page and
+ * tears this listener down before the grant lands anyway — the real fix for
+ * that is adoptServerBalance now adopting history on every balance fetch
+ * (including the normal one on page load), not this listener.
+ */
+export function watchPaypalOrder(orderId: string): void {
+  paypalOrderUnsub?.()
+  paypalOrderUnsub = onSnapshot(
+    doc(getFirebaseDb(), 'orders', orderId),
+    (snap) => {
+      const status = (snap.data() as { status?: string } | undefined)?.status
+      if (status === 'granted') {
+        paypalOrderUnsub?.()
+        paypalOrderUnsub = null
+        void authedFetch('/api/credits/balance').then(adoptServerBalance)
+      }
+      else if (status === 'failed' || status === 'expired') {
+        paypalOrderUnsub?.()
+        paypalOrderUnsub = null
+      }
+    },
+    () => { /* snapshot error (offline/rules) — the next balance refetch still catches up */ },
   )
 }
 

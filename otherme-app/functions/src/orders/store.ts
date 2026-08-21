@@ -202,6 +202,21 @@ export async function listPendingOrders(limit: number): Promise<OrderWithId[]> {
   return snap.docs.map(d => ({ id: d.id, ...(d.data() as OrderDoc) }));
 }
 
+/**
+ * A uid's pending PayPal orders (backlog 4.7 Part B) — used by the PayPal
+ * webhook to match a captured payment (by amount) to the order that
+ * requested it. Equality-only query, same no-composite-index shape as
+ * listPendingOrders.
+ */
+export async function findPendingPaypalOrders(userId: string): Promise<OrderWithId[]> {
+  const snap = await orders()
+    .where("userId", "==", userId)
+    .where("method", "==", "paypal")
+    .where("status", "==", "pending")
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as OrderDoc) }));
+}
+
 /** Advance an order's status, tracking the attempt for retry/backoff bounds. */
 export async function setOrderStatus(
   orderId: string,
