@@ -49,6 +49,13 @@ async function verifyOrder(order: OrderWithId): Promise<VerifyResult | { state: 
     const url = process.env.POLYGON_RPC_URL || POLYGON_RPC_DEFAULT;
     return verifyUsdt(order, url);
   }
+  if (order.method === "paypal") {
+    // No capture-verification analog exists yet (backlog 4.7, Part 4 Phase 2 —
+    // pending PayPal Business account credentials) — skip rather than fall
+    // into the NIM branch below, which would misinterpret a PayPal order as
+    // an unconfirmed NIM payment and eventually fail it after the grace window.
+    return { state: "skipped" };
+  }
   // NIM — verify against NIMIQ_RPC_URL (our node, once up) or the public
   // NimiqWatch default. Empty default = disabled → skip (keeps the temporary
   // client record-purchase grant).

@@ -14,6 +14,7 @@ import { FREE_SCENE_GENERATIONS, SCENE_CREDITS } from '../core/config'
 import { RenderStyle, styleDirective } from '../character/fields'
 import { downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
+import { ensureDataUrl } from '../core/referenceUtils'
 import AppHeader from '../components/AppHeader'
 import CollapsibleCard from '../components/CollapsibleCard'
 import Lightbox from '../components/Lightbox'
@@ -162,7 +163,7 @@ export default function Scenes() {
     try {
       const payload: Record<string, unknown> = { prompt: compileScenePrompt(references, description.trim(), renderStyle) }
       if (references.length)
-        payload.referenceImages = references.map(reference => splitDataUrl(reference.imageDataUrl))
+        payload.referenceImages = await Promise.all(references.map(async reference => splitDataUrl(await ensureDataUrl(reference.imageDataUrl))))
       const response = await fetch(apiUrl('/api/generate-sheet'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

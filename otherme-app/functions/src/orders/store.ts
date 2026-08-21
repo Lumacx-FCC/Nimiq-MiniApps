@@ -27,7 +27,12 @@ import {
 } from "../config.js";
 import { userRef } from "../credits/store.js";
 
-export type OrderMethod = "nim" | "usdt";
+// "paypal" is groundwork only (backlog 4.7) — createOrder below fills in a
+// well-formed order for it, but nothing routes real PayPal traffic here yet:
+// no capture-verification analog exists (Part 4 Phase 2, pending PayPal
+// Business account credentials), so a "paypal" order can be created but never
+// actually granted today.
+export type OrderMethod = "nim" | "usdt" | "paypal";
 export type OrderStatus = "pending" | "submitted" | "confirmed" | "granted" | "failed" | "expired";
 
 export interface OrderDoc {
@@ -89,6 +94,16 @@ export async function createOrder(userId: string, method: OrderMethod, packUsd: 
     expectedAmount = pack.usd / rate;
     expectedBaseUnits = Math.round(expectedAmount * LUNA_PER_NIM);
     expectedRecipient = NIM_TREASURY_ADDRESS;
+  }
+  else if (method === "paypal") {
+    // PayPal orders are exact USD with no treasury address or on-chain base
+    // units — expectedBaseUnits is cents (audit/display only). The real
+    // capture-verification analog (a PayPal order id, checked against
+    // PayPal's API) doesn't exist yet; expectedRecipient is a sentinel until
+    // it does.
+    expectedAmount = pack.usd;
+    expectedBaseUnits = Math.round(pack.usd * 100);
+    expectedRecipient = "paypal";
   }
   else {
     expectedAmount = pack.usd;

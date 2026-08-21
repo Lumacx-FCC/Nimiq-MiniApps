@@ -521,25 +521,31 @@ const PAY_COPY_ES = {
 
 ## 14. Post-competition / future (out of scope for Phases 1–5)
 
-Phases 1–5 are deliberately **wallet-anchored**: identity is proven by a Nimiq
-signature and credits are bought with NIM/USDT inside Nimiq Pay. The items below
-are a separate, post-competition workstream for a **browser-distributed** build
-and are intentionally not part of the current plan.
+Phases 1–5 were deliberately **wallet-anchored**: identity proven by a Nimiq
+signature, credits bought with NIM/USDT inside Nimiq Pay. The items below were
+originally scoped as a separate, later browser-distribution workstream — two
+have since shipped as part of Phase 6 (18 Aug) and today's PayPal scope call
+(20 Aug), so this section is now a historical record plus one open item.
 
-- **Email/Google users are demo-only today** — client-side `localStorage`
-  accounts with no backend, no server ledger, no verification
-  (`emailAuth.ts` is marked "NOT PRODUCTION AUTH"; Google is decoded client-side
-  only). They are not covered by the server-side security model.
-- **Gmail (Google) login — production.** Move to server-side verification: send
-  the Google ID token to the backend, verify its signature, mint a Firebase
-  session, and give these users their own server ledger (same shape as wallet
-  users). Also needs the external-browser redirect flow (Google blocks OAuth in
-  WebViews).
-- **PayPal payments.** Currently `paypalEnabled: false` and **prohibited inside
-  Nimiq Pay** by the competition rules. For the browser-distributed version,
-  enable PayPal as the credit-purchase rail for non-wallet (email/Google) users,
-  with server-side capture verification (the PayPal analog of the on-chain
-  reconciler) before granting credits.
-- Net effect: two parallel secured cohorts — wallet users (NIM/USDT, on-chain
-  verified) and browser users (Google login, PayPal verified) — sharing the same
-  server ledger.
+- ✅ **Email/Google users — SHIPPED (Phase 6, 18 Aug).** No longer demo-only:
+  real Firebase Auth (`createUserWithEmailAndPassword`/`signInWithPopup`),
+  server-verified, with their own server ledger (same shape as wallet users)
+  and account linking to fold a wallet/email/Google identity together. See
+  `otherme-backlog-plan` memory / this file's own Phase 6 references.
+- **PayPal payments — Phase 1 (visibility gating) shipped 20 Aug, real SDK
+  wiring still open.** Scope resolved directly by Lucas: not restricted to a
+  separate browser-distributed build — `paypalEnabled: true` for otherme-app,
+  with a runtime gate in `Credits.tsx` (`user.provider !== 'nimiq'`) hiding
+  the button for wallet sign-ins and showing it for email/Google, since this
+  targets full production rather than the (already-closed) competition rule.
+  `functions/src/orders/store.ts`'s `OrderMethod` recognizes `"paypal"` and
+  the reconciler explicitly skips it (no capture-verification analog exists
+  yet). Still needed before this is real: PayPal Business account
+  credentials + Smart Buttons snippet (Lucas to provide), the create/capture
+  order flow against PayPal's REST API, and the capture-verification
+  "reconciler" analog (no on-chain tx hash exists for PayPal — needs a
+  webhook or a server-side poll against PayPal's Orders API).
+- Net effect once PayPal's real wiring lands: two parallel secured cohorts —
+  wallet users (NIM/USDT, on-chain verified) and email/Google users (PayPal
+  capture-verified) — sharing the same server ledger, both reachable from the
+  same build.

@@ -27,6 +27,7 @@ import { AVATAR_SPRITE_CREDITS } from '../core/config'
 import { listAvatars, persistAvatars } from '../roleplay/avatarLibrary'
 import type { AvatarProfile, ChatMessage, VoiceName } from '../roleplay/types'
 import { downloadDataUrl, downloadJson } from '../character/library'
+import { ensureDataUrl } from '../core/referenceUtils'
 import ErrorNotice from '../components/ErrorNotice'
 import { getSpeechRecognizer, SpeechRecognizer } from '../core/speech'
 import '../styles/roleplay.css'
@@ -502,24 +503,28 @@ export default function RoleplayStudio() {
     if (!raw)
       return
     sessionStorage.removeItem(AVATAR_HANDOFF_KEY)
-    try {
-      const { imageDataUrl, name } = JSON.parse(raw) as { imageDataUrl: string, name: string }
-      const usedSlots = new Set(customAvatars.map(item => item.slot))
-      let nextSlot = 1
-      while (usedSlots.has(nextSlot) && nextSlot <= customSlotCount)
-        nextSlot++
-      if (nextSlot > customSlotCount) {
-        flash(t.slotsFull, true)
-        return
+    void (async () => {
+      try {
+        const { imageDataUrl, name } = JSON.parse(raw) as { imageDataUrl: string, name: string }
+        const usedSlots = new Set(customAvatars.map(item => item.slot))
+        let nextSlot = 1
+        while (usedSlots.has(nextSlot) && nextSlot <= customSlotCount)
+          nextSlot++
+        if (nextSlot > customSlotCount) {
+          flash(t.slotsFull, true)
+          return
+        }
+        // Sheets synced from the cloud carry a Storage URL, not a data: URL —
+        // resolve it before splitting into base64 (see core/referenceUtils.ts).
+        const { base64, mimeType } = splitDataUrl(await ensureDataUrl(imageDataUrl))
+        const bytes = base64ToBytes(base64)
+        const file = new File([bytes], `${(name || 'character').replace(/\s+/g, '-')}.png`, { type: mimeType })
+        setUploadFile(file)
+        setUploadName(name || '')
+        setUploadSlot(nextSlot)
       }
-      const { base64, mimeType } = splitDataUrl(imageDataUrl)
-      const bytes = base64ToBytes(base64)
-      const file = new File([bytes], `${(name || 'character').replace(/\s+/g, '-')}.png`, { type: mimeType })
-      setUploadFile(file)
-      setUploadName(name || '')
-      setUploadSlot(nextSlot)
-    }
-    catch { /* malformed handoff — ignore */ }
+      catch { /* malformed handoff — ignore */ }
+    })()
   }, [])
 
   // Per-minute credit burn against the real shared balance.

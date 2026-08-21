@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://othermeapp.com",
+      "https://otherme-18f5b.web.app",
+      "https://otherme-18f5b.firebaseapp.com",
+      "http://localhost:5174"
+    ],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

@@ -2,11 +2,12 @@
  * Credits — balance, pack purchase with USDT (Polygon) or NIM (+50% bonus),
  * purchase history. Mirrors core-modules CreditsCard on the React bridge.
  */
-import { Coins, History, Loader2, LogOut, Mail, PartyPopper, Smartphone, Sparkles } from 'lucide-react'
+import { Coins, CreditCard, History, Loader2, LogOut, Mail, PartyPopper, Smartphone, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreditPack } from '@core/config'
 import { USDT_GAS_REQUIRED } from '@core/credits/payUsdt'
+import { isPaypalEnabled } from '@core/credits/payPaypal'
 import { useSettings } from '../app/providers'
 import { resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
@@ -50,6 +51,8 @@ const COPY = {
     termsGateConfirm: 'Confirm and continue',
     termsGateCancel: 'Cancel',
     termsGateError: 'Could not confirm — try again in a moment.',
+    paypalTitle: 'Pay with PayPal',
+    paypalComingSoon: 'PayPal checkout is on its way for email/Google accounts — check back soon.',
   },
   es: {
     balance: 'Tus créditos',
@@ -86,6 +89,8 @@ const COPY = {
     termsGateConfirm: 'Confirmar y continuar',
     termsGateCancel: 'Cancelar',
     termsGateError: 'No pudimos confirmar — intenta de nuevo en un momento.',
+    paypalTitle: 'Pagar con PayPal',
+    paypalComingSoon: 'El pago con PayPal llega pronto para cuentas de email/Google — vuelve pronto.',
   },
 } as const
 
@@ -212,6 +217,9 @@ export default function Credits() {
   }
 
   const usdt = quoteUsdt(selected)
+  // PayPal is for users without a crypto wallet — hidden for wallet sign-ins,
+  // shown for email/Google. Runtime gate, not a build-time one (see 4.7).
+  const showPaypal = isPaypalEnabled() && user?.provider !== 'nimiq'
 
   const flowStatus = flow.status
   const flowInProgress = flowStatus === 'approving' || flowStatus === 'submitted' || flowStatus === 'confirming' || flowStatus === 'slow'
@@ -421,6 +429,13 @@ export default function Credits() {
           {t.openTip}
         </p>
       </div>
+
+      {showPaypal && (
+        <div className="om-card mb-4">
+          <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><CreditCard size={18} />{t.paypalTitle}</h2>
+          <p className="text-sm m-0" style={{ color: 'var(--text-60)' }}>{t.paypalComingSoon}</p>
+        </div>
+      )}
 
       <div className="om-card mb-4">
         <h2 className="text-lg font-extrabold mb-3 flex items-center gap-2"><History size={18} />{t.history}</h2>

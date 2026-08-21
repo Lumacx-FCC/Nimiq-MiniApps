@@ -23,7 +23,13 @@ configure({
     '1 scene image = 5 credits',
     '1 video (8s) = 100 credits',
   ],
-  paypalEnabled: false,
+  // Backlog 4.7: PayPal is enabled for the app, but gated per-user in
+  // Credits.tsx (hidden for wallet sign-ins, shown for email/Google) rather
+  // than a build-time flag — Lucas's explicit call, since this targets full
+  // production rather than the (already-closed) competition build. The actual
+  // Smart Buttons SDK wiring is still a placeholder (payPaypal.ts throws)
+  // pending PayPal Business account credentials.
+  paypalEnabled: true,
 })
 
 /**

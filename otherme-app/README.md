@@ -18,11 +18,10 @@ as live voice avatars. Credits are purchased with **USDT (Polygon)** or
 | `/profile` | Linked identities, account linking (pairing code), unlink, UID + copy button (for promotions) | login required |
 | `/promos_management` | Grant credits to an arbitrary address (contest prizes, support credits) | admin only (custom claim) |
 
-Character sheets and custom avatars sync to Firestore + Storage once signed
-in, with localStorage as a read-through cache (`src/character/library.ts`,
-`src/roleplay/avatarLibrary.ts`). Scene and video galleries are still
-IndexedDB-only (`src/core/mediaStore.ts`) — cloud sync for those is staged
-for later (see item 4 below).
+Character sheets, custom avatars, scenes, and videos all sync to Firestore +
+Storage once signed in, with localStorage/IndexedDB kept as a read-through
+cache (`src/character/library.ts`, `src/roleplay/avatarLibrary.ts`,
+`src/core/mediaStore.ts` — see item 4 below).
 
 Light/dark theme and EN/ES language toggles are available on every page.
 
@@ -124,20 +123,37 @@ matched against a real pack via `findPack`, and a NIM credits value must equal
 one of the known bonus-adjusted pack tiers. Kept alive (not retired) for the
 `NIM_SERVER_VERIFIED` rollback path, but no longer an arbitrary-value grant.
 
-### 4. Move saved work off the device — ✅ Stage 1 shipped, Stage 2/3 open
+### 4. Move saved work off the device — ✅ Stage 1/2/3 all shipped
 
-Character sheets and custom avatars now sync to Firestore + Storage
-(`src/character/library.ts`, `src/roleplay/avatarLibrary.ts`) whenever a
-server session exists, with localStorage kept as a read-through cache — no
-UI changes needed, and fully local-only behavior is unchanged when logged
-out. Reconciliation runs once per login (`App.tsx`'s `useCloudMediaSync`).
+Character sheets and custom avatars (Stage 1, 18 Aug), then scenes and videos
+(Stage 2/3, 20 Aug) all sync to Firestore + Storage
+(`src/character/library.ts`, `src/roleplay/avatarLibrary.ts`,
+`src/core/mediaStore.ts`) whenever a server session exists, with
+localStorage/IndexedDB kept as a read-through cache — no UI changes needed for
+any caller, and fully local-only behavior is unchanged when logged out.
+Reconciliation runs once per login (`App.tsx`'s `useCloudMediaSync`).
 
-**Still open, staged deliberately**: scenes (Stage 2) and videos (Stage 3) are
-still IndexedDB-only. Videos are last on purpose — highest storage cost, and a
-`SavedVideo.interactionId` ties a saved video to a live Gemini Interactions
-API session that isn't durable across devices or time, so a synced-then-
-reloaded video needs a "start fresh" fallback rather than assuming it's always
-editable.
+`SavedVideo.interactionId` (the live Gemini Interactions API session backing
+conversational edits) turned out to need no special cross-device handling —
+confirmed by reading the actual code: saved gallery items never expose an edit
+affordance at all (editing only ever happens on the just-generated clip,
+before it's saved), so a synced video's `interactionId` is already purely
+inert metadata once saved.
+
+**Real bug found shipping this, fixed same day**: a synced item's image/video
+field becomes a Storage download URL once pulled from the cloud (instead of
+the local `data:` URL it started as) — `Scenes.tsx`/`Videos.tsx`/
+`RoleplayStudio.tsx` all built AI-generation reference payloads by splitting a
+`data:` URL directly, which silently produced `base64: undefined` for a
+Storage URL. Fixed with a new `ensureDataUrl()` helper
+(`src/core/referenceUtils.ts`) that fetches + re-encodes a remote URL back to
+`data:` before use. That fetch then surfaced a **second**, infra-level gap:
+Cloud Storage buckets have no CORS policy by default, so the browser blocked
+the fetch with a generic "Failed to fetch" — fixed by setting a CORS policy
+on the `otherme-18f5b.firebasestorage.app` bucket (GET only, scoped to
+`othermeapp.com` + the Firebase default hosting domains + localhost dev; no
+code, a one-time Cloud Console / `gsutil cors set` config step, not tied to
+this repo's deploy pipeline).
 
 ### 5. Gasless USDT via a meta-transaction relayer
 
@@ -191,6 +207,28 @@ legal-accuracy call, not a translation one.
 - Real Node host for `server/api.ts` handlers (they only use fetch/env, so
   they're portable).
 
+### 9. PayPal for non-wallet users — ✅ Phase 1 (gating) shipped, Phase 2 open
+
+Scope resolved directly by Lucas (20 Aug): PayPal Smart Buttons should be
+**hidden for wallet sign-ins and shown for any non-wallet sign-in (email or
+Google)** — a runtime gate on `user.provider`, not a separate build, since
+this targets full production rather than the (already-closed) competition.
+`paypalEnabled` is `true` for otherme-app (`src/core/config.ts`);
+`Credits.tsx`'s `showPaypal` gates a placeholder "coming soon" section (below
+the NIM/USDT and "New on Nimiq?" cards) so the visibility logic itself is
+verifiable before real Smart Buttons exist. Server-side, `OrderMethod`
+(`functions/src/orders/store.ts`) now recognizes `"paypal"` and skips the
+treasury/exchange-rate math NIM/USDT need — just enough that the order
+lifecycle type doesn't need a second pass later. The reconciler explicitly
+skips `"paypal"` orders rather than misreading them as unconfirmed NIM.
+
+**Still open, blocked on Lucas**: the actual PayPal JS SDK Smart Buttons
+component, the create/capture order flow against PayPal's REST API, and the
+capture-verification "reconciler" analog (no on-chain tx hash exists for
+PayPal — needs a webhook or a server-side poll against PayPal's API) — none
+of this can be built usefully without a PayPal Business account's client
+credentials and the Smart Button snippet PayPal's dashboard generates.
+
 Done since the last revision of this list: on-chain tx verification before
 granting credits, signed-challenge wallet login, production prices, automatic
 deletion of share-link files, Web Speech dictation as the in-wallet voice
@@ -206,4 +244,7 @@ re-login (item 1's real-world completion), single-sourcing the pricing/
 treasury constants into `functions/src/sharedPricing.ts`, rotating the
 production treasury addresses off the pair that had been publicly labeled
 "test" in the repo's history, rate limiting across the previously-unbounded
-routes (item 2), and the order-claim retry/persistence fix (item 3).
+routes (item 2), the order-claim retry/persistence fix (item 3), cloud sync
+for scenes and videos (item 4, Stage 2/3), the cross-device reference-image
+fix + Storage bucket CORS config that shipping Stage 2/3 surfaced, and
+PayPal visibility gating for non-wallet sign-ins (item 9, Phase 1).

@@ -21,9 +21,12 @@ export interface CoreConfig {
   /** What credits buy — shown under the packs. */
   creditHighlights: string[]
   /**
-   * PayPal placeholder for browser-only distribution. MUST stay false in the
-   * competition build: the rules and the Nimiq mini-app docs prohibit
-   * third-party payment providers inside Nimiq Pay.
+   * PayPal placeholder. The Mini Apps Competition rules and the Nimiq
+   * mini-app docs prohibit third-party payment providers inside Nimiq Pay —
+   * keep this false for any app/build that only targets that context (this
+   * demo app included). An app distributed outside Nimiq Pay too (otherme-app)
+   * may set this true and additionally gate visibility per signed-in identity
+   * (e.g. hidden for wallet sign-ins) rather than relying on this flag alone.
    */
   paypalEnabled: boolean
   /** Fallback NIM/USD rate when the live price API is unreachable. */

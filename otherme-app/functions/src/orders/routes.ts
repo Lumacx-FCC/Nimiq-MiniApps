@@ -22,7 +22,11 @@ export async function handleCreateOrder(req: Request, res: Response): Promise<vo
     res.status(429).json({ error: "Too many orders — try again later." });
     return;
   }
-  const method: OrderMethod = req.body?.method === "usdt" ? "usdt" : "nim";
+  const method: OrderMethod = req.body?.method === "usdt"
+    ? "usdt"
+    : req.body?.method === "paypal"
+      ? "paypal"
+      : "nim";
   const packUsd = Number(req.body?.packUsd);
   if (!Number.isFinite(packUsd)) {
     res.status(400).json({ error: "packUsd is required" });

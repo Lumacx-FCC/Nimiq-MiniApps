@@ -15,6 +15,7 @@ import { VIDEO_CREDITS, VIDEO_MAX_EDITS } from '../core/config'
 import { compileVideoPrompt } from '../character/fields'
 import { compressImageDataUrl, downloadDataUrl, listSheets, shareDataUrl } from '../character/library'
 import { SavedScene, SavedVideo, deleteMedia, listMedia, saveMedia } from '../core/mediaStore'
+import { ensureDataUrl } from '../core/referenceUtils'
 import AppHeader from '../components/AppHeader'
 import CollapsibleCard from '../components/CollapsibleCard'
 import ReferencePicker, { PickedReference } from '../components/ReferencePicker'
@@ -212,7 +213,7 @@ export default function Videos() {
     if (previousInteractionId)
       payload.previousInteractionId = previousInteractionId
     else if (references.length)
-      payload.referenceImages = references.map(reference => splitDataUrl(reference.imageDataUrl))
+      payload.referenceImages = await Promise.all(references.map(async reference => splitDataUrl(await ensureDataUrl(reference.imageDataUrl))))
     const response = await fetch(apiUrl('/api/generate-video'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

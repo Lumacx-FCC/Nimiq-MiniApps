@@ -12,6 +12,7 @@ import Videos from './pages/Videos'
 import Gallery from './pages/Gallery'
 import { reconcileSheetsWithCloud } from './character/library'
 import { reconcileAvatarsWithCloud } from './roleplay/avatarLibrary'
+import { reconcileScenesWithCloud, reconcileVideosWithCloud } from './core/mediaStore'
 import { onSessionChange } from './core/session'
 
 /** Every navigation lands on the top of the new page (hero / stage in view). */
@@ -32,6 +33,8 @@ function useCloudMediaSync() {
       return
     reconcileSheetsWithCloud(uid).catch(() => {})
     reconcileAvatarsWithCloud(uid).catch(() => {})
+    reconcileScenesWithCloud(uid).catch(() => {})
+    reconcileVideosWithCloud(uid).catch(() => {})
   }), [])
 }
 
