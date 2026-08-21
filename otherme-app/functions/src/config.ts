@@ -8,7 +8,7 @@
  * EVM_TREASURY_ADDRESS are still the shared test pair — replace before real
  * purchases should count as revenue.
  */
-export { EVM_TREASURY_ADDRESS, NIM_BONUS_MULTIPLIER, NIM_TREASURY_ADDRESS, PACKS } from "./sharedPricing.js";
+export { EVM_TREASURY_ADDRESS, NIM_BONUS_MULTIPLIER, NIM_TREASURY_ADDRESS, PACKS, REGULAR_PACKS } from "./sharedPricing.js";
 import { PACKS } from "./sharedPricing.js";
 
 export const NIM_USD_FALLBACK_RATE = 0.005;
@@ -65,8 +65,8 @@ export const RECONCILE_BATCH = 25;
 /** App id used in the NIM transaction data tag (`<appId>:<orderId>`). */
 export const APP_ID = "otherme";
 
-export function findPack(usd: number): { usd: number; credits: number } | null {
-  return PACKS.find(p => Math.abs(p.usd - usd) < 1e-9) ?? null;
+export function findPack(usd: number, list: readonly { usd: number; credits: number }[] = PACKS): { usd: number; credits: number } | null {
+  return list.find(p => Math.abs(p.usd - usd) < 1e-9) ?? null;
 }
 
 /** NIM/USD from CoinGecko (same source as the client), with a static fallback. */

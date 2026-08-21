@@ -29,4 +29,16 @@ export const PACKS = [
   { usd: 15.00, credits: 1000 },
 ] as const;
 
+/**
+ * Regular (non-discounted) prices for the same 3 pack sizes — the early-bird
+ * discount in PACKS above doesn't apply to the PayPal/Credit Card rail
+ * (backlog 4.7), whose 3 PayPal Hosted Buttons are configured at these fixed
+ * prices on PayPal's own side. Same order as PACKS (Starter/Value/Power).
+ */
+export const REGULAR_PACKS = [
+  { usd: 1, credits: 30 },
+  { usd: 5, credits: 200 },
+  { usd: 20, credits: 1000 },
+] as const;
+
 export const NIM_BONUS_MULTIPLIER = 1.5;

@@ -207,27 +207,38 @@ legal-accuracy call, not a translation one.
 - Real Node host for `server/api.ts` handlers (they only use fetch/env, so
   they're portable).
 
-### 9. PayPal for non-wallet users — ✅ Phase 1 (gating) shipped, Phase 2 open
+### 9. PayPal for non-wallet users — ✅ Part A (checkout) shipped, Part B (crediting) open
 
-Scope resolved directly by Lucas (20 Aug): PayPal Smart Buttons should be
+Scope resolved directly by Lucas (20 Aug): PayPal checkout should be
 **hidden for wallet sign-ins and shown for any non-wallet sign-in (email or
 Google)** — a runtime gate on `user.provider`, not a separate build, since
 this targets full production rather than the (already-closed) competition.
-`paypalEnabled` is `true` for otherme-app (`src/core/config.ts`);
-`Credits.tsx`'s `showPaypal` gates a placeholder "coming soon" section (below
-the NIM/USDT and "New on Nimiq?" cards) so the visibility logic itself is
-verifiable before real Smart Buttons exist. Server-side, `OrderMethod`
-(`functions/src/orders/store.ts`) now recognizes `"paypal"` and skips the
-treasury/exchange-rate math NIM/USDT need — just enough that the order
-lifecycle type doesn't need a second pass later. The reconciler explicitly
-skips `"paypal"` orders rather than misreading them as unconfirmed NIM.
 
-**Still open, blocked on Lucas**: the actual PayPal JS SDK Smart Buttons
-component, the create/capture order flow against PayPal's REST API, and the
-capture-verification "reconciler" analog (no on-chain tx hash exists for
-PayPal — needs a webhook or a server-side poll against PayPal's API) — none
-of this can be built usefully without a PayPal Business account's client
-credentials and the Smart Button snippet PayPal's dashboard generates.
+**Part A — real checkout, shipped and confirmed live-tested.** The Credits
+page (`Credits.tsx`) is now a nav-driven toggle: nothing shows below the
+balance card until "Buy Credits with NIM" / "Buy Credits with Card" / "Show
+Purchases" is clicked, with nudge banners letting a user swap between NIM and
+Card modes. Selecting one of 3 package images renders that pack's real
+PayPal Hosted Button (`core-modules/.../payPaypal.ts`'s `renderHostedButton`,
+a script-loader mirroring `googleAuth.ts`'s `loadGis()`) and fires an
+audit-trail server order (`OrderMethod` recognizes `"paypal"`, priced off a
+new `REGULAR_PACKS` since Card packages don't get the early-bird discount).
+Two navigation guards, added after live-testing surfaced real gaps: no
+linked wallet → guided to `/profile` instead of Top Up; unverified email (or
+a wallet-signed-in user with no active email identity) → guided via a popup
+instead of entering Card mode. The email-verification check went through one
+real bug fix — the first cut trusted a client flag that defaulted to
+"verified" before the server round-trip landed, letting an unverified email
+slip through briefly; fixed with a live Firebase re-check, pessimistic by
+default.
+
+**Part B — still open, blocked on Lucas**: real payments succeed today but
+nothing auto-credits the balance yet. Needs the actual create/capture order
+flow against PayPal's REST API and a capture-verification "reconciler"
+analog (no on-chain tx hash exists for PayPal — needs a webhook or a
+server-side poll) — none of this can be built usefully until Lucas creates a
+webhook in the PayPal Developer Dashboard and gets the client secret into
+Secret Manager.
 
 Done since the last revision of this list: on-chain tx verification before
 granting credits, signed-challenge wallet login, production prices, automatic
@@ -246,5 +257,6 @@ production treasury addresses off the pair that had been publicly labeled
 "test" in the repo's history, rate limiting across the previously-unbounded
 routes (item 2), the order-claim retry/persistence fix (item 3), cloud sync
 for scenes and videos (item 4, Stage 2/3), the cross-device reference-image
-fix + Storage bucket CORS config that shipping Stage 2/3 surfaced, and
-PayPal visibility gating for non-wallet sign-ins (item 9, Phase 1).
+fix + Storage bucket CORS config that shipping Stage 2/3 surfaced, the
+Credits page's nav-driven toggle redesign with real PayPal Hosted Buttons
+checkout and its two navigation guards (item 9, Part A).

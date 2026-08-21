@@ -5,7 +5,11 @@
 import { configure } from '@core/config'
 // Single source of truth for treasuries/prices/bonus, shared with the server
 // (functions/src/config.ts imports the same file) — see its own header comment.
-import { EVM_TREASURY_ADDRESS, NIM_BONUS_MULTIPLIER, NIM_TREASURY_ADDRESS, PACKS } from '../../functions/src/sharedPricing'
+import { EVM_TREASURY_ADDRESS, NIM_BONUS_MULTIPLIER, NIM_TREASURY_ADDRESS, PACKS, REGULAR_PACKS } from '../../functions/src/sharedPricing'
+
+/** PayPal REST app client ID — public/embeddable, same posture as the
+ * Firebase web API key already committed in firebase.ts. */
+const PAYPAL_CLIENT_ID = 'BAA9lUWk2NboIhxcfoMoktoVWHEklLxzISrOr-BWSKLhIg3OjaTl4KRGox_OLtX8gqFFb8OwVvNUVv8GmY'
 
 configure({
   appId: 'otherme',
@@ -26,11 +30,24 @@ configure({
   // Backlog 4.7: PayPal is enabled for the app, but gated per-user in
   // Credits.tsx (hidden for wallet sign-ins, shown for email/Google) rather
   // than a build-time flag — Lucas's explicit call, since this targets full
-  // production rather than the (already-closed) competition build. The actual
-  // Smart Buttons SDK wiring is still a placeholder (payPaypal.ts throws)
-  // pending PayPal Business account credentials.
+  // production rather than the (already-closed) competition build. Checkout
+  // renders via PayPal Hosted Buttons (see PAYPAL_PACKS below); crediting
+  // (backlog 4.7 Part B) is a separate, not-yet-built webhook.
   paypalEnabled: true,
+  paypalClientId: PAYPAL_CLIENT_ID,
 })
+
+/**
+ * The 3 fixed-price PayPal Hosted Buttons Lucas configured in the PayPal
+ * Business dashboard — same order as REGULAR_PACKS/PACKS (Starter/Value/
+ * Power). No early-bird discount here (unlike NIM/USDT): these are the
+ * regular prices, since PayPal's own buttons are configured at fixed amounts.
+ */
+export const PAYPAL_PACKS = REGULAR_PACKS.map((pack, i) => ({
+  ...pack,
+  hostedButtonId: ['DJ877RJ4MY2YS', 'FWB4W4YLNXY3S', '8ZTQ4HPNWTTXW'][i],
+  image: ['/credit-packs/starter-30.png', '/credit-packs/value-200.png', '/credit-packs/power-1000.png'][i],
+}))
 
 /**
  * Regular (pre-discount) price per pack, keyed by the early-bird price we charge.

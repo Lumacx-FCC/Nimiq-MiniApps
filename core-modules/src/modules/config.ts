@@ -29,6 +29,10 @@ export interface CoreConfig {
    * (e.g. hidden for wallet sign-ins) rather than relying on this flag alone.
    */
   paypalEnabled: boolean
+  /** PayPal REST app client ID — public/embeddable by design (same posture as
+   * a Firebase web API key), used to load the PayPal JS SDK client-side.
+   * Empty when `paypalEnabled` is false. */
+  paypalClientId: string
   /** Fallback NIM/USD rate when the live price API is unreachable. */
   nimUsdFallbackRate: number
 }
@@ -57,6 +61,7 @@ const config: CoreConfig = {
     '1 video (8 seconds) = 100 credits',
   ],
   paypalEnabled: false,
+  paypalClientId: '',
   nimUsdFallbackRate: 0.005,
 }
 

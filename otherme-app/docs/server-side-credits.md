@@ -532,19 +532,26 @@ have since shipped as part of Phase 6 (18 Aug) and today's PayPal scope call
   server-verified, with their own server ledger (same shape as wallet users)
   and account linking to fold a wallet/email/Google identity together. See
   `otherme-backlog-plan` memory / this file's own Phase 6 references.
-- **PayPal payments — Phase 1 (visibility gating) shipped 20 Aug, real SDK
-  wiring still open.** Scope resolved directly by Lucas: not restricted to a
-  separate browser-distributed build — `paypalEnabled: true` for otherme-app,
-  with a runtime gate in `Credits.tsx` (`user.provider !== 'nimiq'`) hiding
-  the button for wallet sign-ins and showing it for email/Google, since this
-  targets full production rather than the (already-closed) competition rule.
-  `functions/src/orders/store.ts`'s `OrderMethod` recognizes `"paypal"` and
-  the reconciler explicitly skips it (no capture-verification analog exists
-  yet). Still needed before this is real: PayPal Business account
-  credentials + Smart Buttons snippet (Lucas to provide), the create/capture
-  order flow against PayPal's REST API, and the capture-verification
-  "reconciler" analog (no on-chain tx hash exists for PayPal — needs a
-  webhook or a server-side poll against PayPal's Orders API).
+- **PayPal payments — Part A (real checkout) shipped and confirmed
+  live-tested 20–21 Aug, Part B (crediting) still open.** Scope resolved
+  directly by Lucas: not restricted to a separate browser-distributed build —
+  `paypalEnabled: true` for otherme-app, with a runtime gate in `Credits.tsx`
+  (`user.provider !== 'nimiq'`) hiding Card mode for wallet sign-ins and
+  showing it for email/Google, since this targets full production rather
+  than the (already-closed) competition rule. Real PayPal Hosted Buttons
+  checkout renders for 3 fixed-price packages (priced off a new
+  `REGULAR_PACKS`, no early-bird discount); two navigation guards (no linked
+  wallet, unverified email) gate access to each mode, with the
+  email-verification guard using a live Firebase re-check (pessimistic
+  default) after an initial cut using a stale client flag let an unverified
+  account through briefly. `functions/src/orders/store.ts`'s `OrderMethod`
+  recognizes `"paypal"` and the reconciler explicitly skips it (no
+  capture-verification analog exists yet). Still needed before Part B is
+  real: Lucas creating a webhook in the PayPal Developer Dashboard + getting
+  the client secret into Secret Manager, then the create/capture order flow
+  against PayPal's REST API and the capture-verification "reconciler" analog
+  (no on-chain tx hash exists for PayPal — needs a webhook or a server-side
+  poll against PayPal's Orders API).
 - Net effect once PayPal's real wiring lands: two parallel secured cohorts —
   wallet users (NIM/USDT, on-chain verified) and email/Google users (PayPal
   capture-verified) — sharing the same server ledger, both reachable from the

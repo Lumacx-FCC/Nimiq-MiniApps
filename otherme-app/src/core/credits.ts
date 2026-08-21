@@ -243,13 +243,19 @@ onSessionChange((address) => {
 
 interface ServerOrder {
   orderId: string
-  method: 'nim' | 'usdt'
+  method: 'nim' | 'usdt' | 'paypal'
   expectedAmount: number
   expectedRecipient: string
   credits: number
 }
 
-async function createServerOrder(method: 'nim' | 'usdt', packUsd: number): Promise<ServerOrder> {
+/**
+ * Creates a server-side order doc. For 'paypal', this is audit-trail-only —
+ * the PayPal Hosted Button renders and completes the payment regardless; the
+ * order doc just gives the eventual webhook-driven grant (backlog 4.7 Part B)
+ * something to match against.
+ */
+export async function createServerOrder(method: 'nim' | 'usdt' | 'paypal', packUsd: number): Promise<ServerOrder> {
   const data = await authedFetch('/api/orders', { method, packUsd })
   if (!data || data.error)
     throw new Error(data?.error || 'Could not create the payment order')

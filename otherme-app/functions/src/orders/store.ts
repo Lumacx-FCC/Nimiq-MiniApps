@@ -23,6 +23,7 @@ import {
   NIM_BONUS_MULTIPLIER,
   NIM_TREASURY_ADDRESS,
   ORDER_TTL_MS,
+  REGULAR_PACKS,
   USDT_DECIMALS,
 } from "../config.js";
 import { userRef } from "../credits/store.js";
@@ -79,7 +80,10 @@ export async function createOrder(userId: string, method: OrderMethod, packUsd: 
   if (!userSnap.data()?.termsAcceptedAt)
     return { error: "Terms not accepted" };
 
-  const pack = findPack(packUsd);
+  // PayPal packs are the REGULAR (non-discounted) prices — the early-bird
+  // discount doesn't apply there, since PayPal's own Hosted Buttons are
+  // configured at these fixed prices, separately from PACKS.
+  const pack = method === "paypal" ? findPack(packUsd, REGULAR_PACKS) : findPack(packUsd);
   if (!pack)
     return { error: "Unknown credit pack" };
 

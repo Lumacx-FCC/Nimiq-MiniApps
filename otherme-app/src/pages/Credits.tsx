@@ -2,18 +2,21 @@
  * Credits — balance, pack purchase with USDT (Polygon) or NIM (+50% bonus),
  * purchase history. Mirrors core-modules CreditsCard on the React bridge.
  */
-import { Coins, CreditCard, History, Loader2, LogOut, Mail, PartyPopper, Smartphone, Sparkles } from 'lucide-react'
+import { Coins, CreditCard, History, Loader2, LogOut, Mail, PartyPopper, Smartphone, Sparkles, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreditPack } from '@core/config'
 import { USDT_GAS_REQUIRED } from '@core/credits/payUsdt'
-import { isPaypalEnabled } from '@core/credits/payPaypal'
+import { isPaypalEnabled, renderHostedButton } from '@core/credits/payPaypal'
 import { useSettings } from '../app/providers'
-import { resendVerificationEmail } from '../core/authProviders'
+import { checkEmailVerified, resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
-import { acceptTerms, useCredits } from '../core/credits'
-import { REGULAR_USD } from '../core/config'
+import { acceptTerms, createServerOrder, useCredits } from '../core/credits'
+import { getAccountOverview } from '../core/accountLink'
+import { PAYPAL_PACKS, REGULAR_USD } from '../core/config'
 import AppHeader from '../components/AppHeader'
+
+type CreditsMode = 'nim' | 'card' | 'history' | 'linkWallet' | null
 
 const COPY = {
   en: {
@@ -51,8 +54,19 @@ const COPY = {
     termsGateConfirm: 'Confirm and continue',
     termsGateCancel: 'Cancel',
     termsGateError: 'Could not confirm — try again in a moment.',
-    paypalTitle: 'Pay with PayPal',
-    paypalComingSoon: 'PayPal checkout is on its way for email/Google accounts — check back soon.',
+    navNim: 'Buy Credits with NIM',
+    navCard: 'Buy Credits with Card',
+    navHistory: 'Show Purchases',
+    payCardBanner: 'Prefer to pay with a card?',
+    payCardTitle: 'Pay with Credit Card',
+    nimiqBonusBanner: 'Get 50% more credits using Nimiq Pay',
+    choosePackage: 'Choose a package',
+    checkoutTitle: 'Complete your purchase',
+    changePackage: 'Choose a different package',
+    noWalletNotice: 'No wallet linked yet — please download the Nimiq Pay app and link your accounts first.',
+    noEmailNotice: 'A verified email is needed before using Credit Card payments — log out and sign in with Gmail/Email, then link your accounts from the Profile tab.',
+    linkEmailNotice: 'To pay with a card, sign in with an email or Google account — link one from your Profile page first if you don’t have one yet.',
+    noticeOk: 'Got it',
   },
   es: {
     balance: 'Tus créditos',
@@ -89,8 +103,19 @@ const COPY = {
     termsGateConfirm: 'Confirmar y continuar',
     termsGateCancel: 'Cancelar',
     termsGateError: 'No pudimos confirmar — intenta de nuevo en un momento.',
-    paypalTitle: 'Pagar con PayPal',
-    paypalComingSoon: 'El pago con PayPal llega pronto para cuentas de email/Google — vuelve pronto.',
+    navNim: 'Comprar créditos con NIM',
+    navCard: 'Comprar créditos con Tarjeta',
+    navHistory: 'Ver compras',
+    payCardBanner: '¿Prefieres pagar con tarjeta?',
+    payCardTitle: 'Pagar con Tarjeta',
+    nimiqBonusBanner: 'Obtén 50% más créditos con Nimiq Pay',
+    choosePackage: 'Elige un paquete',
+    checkoutTitle: 'Completa tu compra',
+    changePackage: 'Elegir otro paquete',
+    noWalletNotice: 'Aún no tienes un monedero vinculado — descarga la app Nimiq Pay y vincula tus cuentas primero.',
+    noEmailNotice: 'Necesitas un email verificado para usar pagos con tarjeta — cierra sesión e inicia sesión con Gmail/Email, luego vincula tus cuentas desde la pestaña Perfil.',
+    linkEmailNotice: 'Para pagar con tarjeta, inicia sesión con una cuenta de email o Google — vincula una desde tu perfil si aún no tienes.',
+    noticeOk: 'Entendido',
   },
 } as const
 
@@ -127,6 +152,85 @@ const PAY_COPY = {
   },
 } as const
 
+/**
+ * Package grid + live PayPal Hosted Button checkout (backlog 4.7 Part A).
+ * Selecting a pack renders that pack's real Hosted Button (Lucas's PayPal
+ * dashboard snippet) and fires an audit-trail server order — Part B's
+ * (not yet built) webhook grants credits by matching the payer's email
+ * against this order, with a manual-grant fallback for anything unmatched.
+ */
+function PaypalPackageSelector({ t }: { t: typeof COPY['en'] | typeof COPY['es'] }) {
+  const [selected, setSelected] = useState<typeof PAYPAL_PACKS[number] | null>(null)
+
+  useEffect(() => {
+    if (!selected)
+      return
+    void renderHostedButton(selected.hostedButtonId, `paypal-container-${selected.hostedButtonId}`)
+    void createServerOrder('paypal', selected.usd).catch(() => {})
+  }, [selected])
+
+  return (
+    <div className="om-card mb-4">
+      <h2 className="text-lg font-extrabold mb-3">{t.choosePackage}</h2>
+      <div className="grid grid-cols-3 gap-2">
+        {PAYPAL_PACKS.map(pack => (
+          <button
+            key={pack.hostedButtonId}
+            onClick={() => setSelected(pack)}
+            className="rounded-2xl overflow-hidden border-2 transition-colors"
+            style={{ borderColor: selected?.hostedButtonId === pack.hostedButtonId ? 'var(--nimiq-light-blue)' : 'var(--highlight-bg)' }}
+          >
+            <img src={pack.image} alt={`${pack.credits} credits · $${pack.usd}`} className="w-full h-auto" />
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <div className="mt-4">
+          <h3 className="text-sm font-extrabold mb-2">{t.checkoutTitle}</h3>
+          <div id={`paypal-container-${selected.hostedButtonId}`} />
+          <button className="om-button secondary w-full mt-3 !text-xs !min-h-[36px]" onClick={() => setSelected(null)}>
+            {t.changePackage}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Shared between Credit Card mode (a nudge toward NIM) and the no-wallet
+ * guard on "Buy Credits with NIM" (link a wallet first). */
+function NewOnNimiqCard({ t }: { t: typeof COPY['en'] | typeof COPY['es'] }) {
+  return (
+    <div className="om-card mb-4">
+      <div className="grid grid-cols-2 gap-2">
+        <a
+          className="om-button secondary"
+          href="https://www.nimiq.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 13, padding: '10px 12px' }}
+        >
+          <Sparkles size={15} />
+          {t.newToNimiq}
+        </a>
+        <a
+          className="om-button secondary"
+          href="https://play.google.com/store/search?q=nimiq%20pay&c=apps&hl=en"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 13, padding: '10px 12px' }}
+        >
+          <Smartphone size={15} />
+          {t.getNimiqPay}
+        </a>
+      </div>
+      <p className="text-xs text-center mt-2.5 mb-0" style={{ color: 'var(--text-40)' }}>
+        {t.openTip}
+      </p>
+    </div>
+  )
+}
+
 export default function Credits() {
   const { lang } = useSettings()
   const t = COPY[lang]
@@ -145,6 +249,20 @@ export default function Credits() {
   const [pendingBuy, setPendingBuy] = useState<'nim' | 'usdt' | null>(null)
   const [termsChecked, setTermsChecked] = useState(false)
   const [termsGateState, setTermsGateState] = useState<'idle' | 'confirming' | 'error'>('idle')
+  // Nav-driven sections: exactly one of Top Up / Credit Card / Purchases shows
+  // at a time, nothing shows until a nav button (or a nudge banner) is clicked.
+  const [mode, setMode] = useState<CreditsMode>(null)
+  // Optimistic default (true) so a slow account-overview check never blocks a
+  // legitimately wallet-linked user — only flips false once confirmed absent,
+  // same defensive pattern as WalletLinkNudge.tsx.
+  const [hasWallet, setHasWallet] = useState(true)
+  // Pessimistic default (false) — the opposite polarity from hasWallet above,
+  // deliberately: this gates PayPal's payer-email matching (backlog 4.7 Part
+  // B), so a false positive here (letting an unverified email through) is a
+  // real correctness bug, not just a UX flash. Only flips true once Firebase
+  // actually confirms it (checkEmailVerified reloads live, not a cached claim).
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [notice, setNotice] = useState<'wallet' | 'linkEmail' | 'emailUnverified' | null>(null)
 
   const handleResend = async () => {
     setResendState('sending')
@@ -207,6 +325,17 @@ export default function Credits() {
     return () => { cancelled = true }
   }, [selected])
 
+  useEffect(() => {
+    if (user?.provider === 'nimiq')
+      return
+    getAccountOverview()
+      .then(overview => setHasWallet(overview.linkedAccounts.some(a => a.provider === 'nimiq')))
+      .catch(() => {})
+    checkEmailVerified()
+      .then(v => setEmailVerified(v === true))
+      .catch(() => {})
+  }, [user])
+
   if (!isLoggedIn) {
     return (
       <div className="page-shell">
@@ -220,6 +349,31 @@ export default function Credits() {
   // PayPal is for users without a crypto wallet — hidden for wallet sign-ins,
   // shown for email/Google. Runtime gate, not a build-time one (see 4.7).
   const showPaypal = isPaypalEnabled() && user?.provider !== 'nimiq'
+
+  const handleNimClick = () => {
+    if (hasWallet)
+      setMode('nim')
+    else {
+      setMode('linkWallet')
+      setNotice('wallet')
+    }
+  }
+
+  const handleCardClick = () => {
+    // A wallet-signed-in user has no active email/Google identity for PayPal
+    // to match a payment against — guide them to sign in with one instead of
+    // entering Credit Card mode at all (even if a wallet-linked email exists,
+    // per the base rule: this gate is on the CURRENT sign-in, not any linked one).
+    if (user?.provider === 'nimiq') {
+      setNotice('linkEmail')
+      return
+    }
+    if (!emailVerified) {
+      setNotice('emailUnverified')
+      return
+    }
+    setMode('card')
+  }
 
   const flowStatus = flow.status
   const flowInProgress = flowStatus === 'approving' || flowStatus === 'submitted' || flowStatus === 'confirming' || flowStatus === 'slow'
@@ -297,6 +451,17 @@ export default function Credits() {
         </button>
       )}
 
+      {notice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} role="dialog" aria-modal="true">
+          <div className="om-card w-full max-w-sm text-center">
+            <p className="text-sm mb-4" style={{ color: 'var(--text-60)' }}>
+              {notice === 'wallet' ? t.noWalletNotice : notice === 'linkEmail' ? t.linkEmailNotice : t.noEmailNotice}
+            </p>
+            <button className="om-button secondary w-full" onClick={() => setNotice(null)}>{t.noticeOk}</button>
+          </div>
+        </div>
+      )}
+
       {emailVerificationPending && (
         <div className="om-card mb-4" style={{ borderColor: 'var(--nimiq-gold)' }}>
           <p className="text-sm font-extrabold mb-1 flex items-center gap-2">
@@ -335,6 +500,34 @@ export default function Credits() {
         </div>
       </div>
 
+      <div className="flex gap-2 mb-4">
+        <button
+          className="om-button secondary flex-1 !text-xs !min-h-[46px] !flex-col !gap-1"
+          onClick={handleNimClick}
+        >
+          <Wallet size={16} />
+          {t.navNim}
+        </button>
+        {showPaypal && (
+          <button
+            className="om-button secondary flex-1 !text-xs !min-h-[46px] !flex-col !gap-1"
+            onClick={handleCardClick}
+          >
+            <CreditCard size={16} />
+            {t.navCard}
+          </button>
+        )}
+        <button
+          className="om-button secondary flex-1 !text-xs !min-h-[46px] !flex-col !gap-1"
+          onClick={() => setMode('history')}
+        >
+          <History size={16} />
+          {t.navHistory}
+        </button>
+      </div>
+
+      {mode === 'nim' && (
+      <>
       <div className="om-card mb-4">
         <h2 className="text-lg font-extrabold mb-3">{t.packs}</h2>
         {/* Early-bird promo: the USD prices below are already discounted. */}
@@ -401,42 +594,35 @@ export default function Credits() {
         </div>
         {error && <div className="nq-notice error" role="alert">{error === USDT_GAS_REQUIRED ? t.gasError : error}</div>}
       </div>
-
-      <div className="om-card mb-4">
-        <div className="grid grid-cols-2 gap-2">
-          <a
-            className="om-button secondary"
-            href="https://www.nimiq.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 13, padding: '10px 12px' }}
-          >
-            <Sparkles size={15} />
-            {t.newToNimiq}
-          </a>
-          <a
-            className="om-button secondary"
-            href="https://play.google.com/store/search?q=nimiq%20pay&c=apps&hl=en"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 13, padding: '10px 12px' }}
-          >
-            <Smartphone size={15} />
-            {t.getNimiqPay}
-          </a>
-        </div>
-        <p className="text-xs text-center mt-2.5 mb-0" style={{ color: 'var(--text-40)' }}>
-          {t.openTip}
-        </p>
-      </div>
-
-      {showPaypal && (
-        <div className="om-card mb-4">
-          <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><CreditCard size={18} />{t.paypalTitle}</h2>
-          <p className="text-sm m-0" style={{ color: 'var(--text-60)' }}>{t.paypalComingSoon}</p>
-        </div>
+      <button
+        onClick={handleCardClick}
+        className="om-card mb-4 w-full text-left"
+        style={{ cursor: 'pointer' }}
+      >
+        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-40)' }}>{t.payCardBanner}</p>
+        <h2 className="text-lg font-extrabold flex items-center gap-2 m-0"><CreditCard size={18} />{t.payCardTitle}</h2>
+      </button>
+      </>
       )}
 
+      {mode === 'card' && showPaypal && (
+      <>
+      <PaypalPackageSelector t={t} />
+      <button
+        onClick={handleNimClick}
+        className="w-full text-left rounded-2xl px-3 py-2.5 mb-2 font-extrabold text-sm"
+        style={{ background: 'var(--nimiq-gold-bg)', color: '#1f2348', cursor: 'pointer', border: 'none' }}
+      >
+        {t.nimiqBonusBanner}
+      </button>
+
+      <NewOnNimiqCard t={t} />
+      </>
+      )}
+
+      {mode === 'linkWallet' && <NewOnNimiqCard t={t} />}
+
+      {mode === 'history' && (
       <div className="om-card mb-4">
         <h2 className="text-lg font-extrabold mb-3 flex items-center gap-2"><History size={18} />{t.history}</h2>
         {!history.length && <p className="text-sm" style={{ color: 'var(--text-40)' }}>{t.empty}</p>}
@@ -448,6 +634,7 @@ export default function Credits() {
           </div>
         ))}
       </div>
+      )}
 
       <button className="om-button secondary w-full" onClick={() => { logout(); navigate('/') }}>
         <LogOut size={16} />
