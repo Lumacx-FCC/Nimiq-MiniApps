@@ -1,10 +1,18 @@
 /*
  * Roleplay studio styles — ported from Aeternum (globals.css) and scoped to
- * .rp-root. Palette variables live on .rp-root so the module follows the
- * app-wide light/dark toggle: dark keeps the original cinematic look, light
- * swaps shell surfaces while the stage stays scene-driven.
+ * .rp-root. Color variables are keyed off a `data-rp-palette` attribute
+ * (Tier 5.4's Theme dropdown, orthogonal to the app-wide light/dark toggle)
+ * instead of living directly on the bare .rp-root selector.
  */
 .rp-root {
+  color: var(--text);
+  font-family: 'Muli', 'Mulish', Arial, Helvetica, sans-serif;
+}
+
+/* ---- Palette: Fantasy — the original cinematic look, also the safe
+   fallback when no data-rp-palette attribute is present yet. ---- */
+.rp-root:not([data-rp-palette]),
+.rp-root[data-rp-palette='fantasy'] {
   --ink: #06090a;
   --panel: #0d1213;
   --panel-2: #111819;
@@ -24,12 +32,10 @@
   --panel-veil: rgba(14, 20, 21, .74);
   --chip-bg: rgba(255, 255, 255, .035);
   --input-bg: rgba(4, 7, 8, .72);
-
-  color: var(--text);
-  font-family: 'Muli', 'Mulish', Arial, Helvetica, sans-serif;
 }
 
-:root[data-theme='light'] .rp-root {
+:root[data-theme='light'] .rp-root:not([data-rp-palette]),
+:root[data-theme='light'] .rp-root[data-rp-palette='fantasy'] {
   --ink: #eef5f7;
   --panel: #ffffff;
   --panel-2: #f2f8fa;
@@ -48,6 +54,144 @@
   --panel-veil: rgba(255, 255, 255, .78);
   --chip-bg: rgba(31, 35, 72, .05);
   --input-bg: rgba(31, 35, 72, .05);
+}
+
+/* ---- Palette: Default — mirrors the main app's own theme tokens
+   (global.css), so it automatically follows the app-wide light/dark toggle
+   via ordinary CSS variable inheritance instead of its own light block. ---- */
+.rp-root[data-rp-palette='default'] {
+  --ink: var(--nq-bg);
+  --panel: var(--nq-card);
+  --panel-2: var(--nq-card);
+  --line: var(--highlight-bg);
+  --line-strong: rgba(46, 163, 180, 0.4);
+  --text: var(--text-100);
+  --muted: var(--text-60);
+  --emerald: var(--om-teal);
+  --emerald-2: var(--om-teal-deep);
+  --gold: var(--nimiq-gold);
+  --danger: var(--nimiq-red);
+  --shell-bg: var(--page-gradient);
+  --surface-veil: var(--highlight-bg);
+  --rail-veil: var(--highlight-bg);
+  --panel-veil: var(--highlight-bg);
+  --chip-bg: var(--highlight-bg);
+  --input-bg: var(--highlight-bg);
+}
+
+/* ---- Palette: Futuristic — neon cyber-noir ---- */
+.rp-root[data-rp-palette='futuristic'] {
+  --ink: #05070d;
+  --panel: #0b0e1a;
+  --panel-2: #10152a;
+  --line: rgba(120, 200, 255, 0.16);
+  --line-strong: rgba(0, 229, 255, 0.5);
+  --text: #eaf6ff;
+  --muted: #7f93b0;
+  --emerald: #00e5ff;
+  --emerald-2: #7b5cff;
+  --gold: #ff2fb1;
+  --danger: #ff4d6a;
+  --shell-bg:
+    radial-gradient(circle at 50% -10%, rgba(0, 229, 255, .16), transparent 36rem),
+    linear-gradient(150deg, #05060c 0%, #090b17 55%, #050710 100%);
+  --surface-veil: rgba(5, 7, 13, .82);
+  --rail-veil: rgba(8, 10, 18, .78);
+  --panel-veil: rgba(11, 14, 26, .74);
+  --chip-bg: rgba(0, 229, 255, .07);
+  --input-bg: rgba(5, 7, 13, .72);
+}
+
+/* ---- Palette: Fun — candy-bright ---- */
+.rp-root[data-rp-palette='fun'] {
+  --ink: #170f2e;
+  --panel: #241a44;
+  --panel-2: #2c2054;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-strong: rgba(255, 111, 181, 0.55);
+  --text: #fff7fb;
+  --muted: #c9b8dd;
+  --emerald: #ff6fb5;
+  --emerald-2: #ffd166;
+  --gold: #6ee7b7;
+  --danger: #ff5c72;
+  --shell-bg:
+    radial-gradient(circle at 50% -10%, rgba(255, 111, 181, .2), transparent 36rem),
+    linear-gradient(150deg, #180f30 0%, #241a44 55%, #150c29 100%);
+  --surface-veil: rgba(23, 15, 46, .82);
+  --rail-veil: rgba(28, 19, 54, .78);
+  --panel-veil: rgba(36, 26, 68, .74);
+  --chip-bg: rgba(255, 111, 181, .1);
+  --input-bg: rgba(23, 15, 46, .68);
+}
+
+/* ---- Palette: Formal — understated charcoal & brass ---- */
+.rp-root[data-rp-palette='formal'] {
+  --ink: #0e1116;
+  --panel: #161a21;
+  --panel-2: #1b202a;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(196, 168, 110, 0.42);
+  --text: #eef1f5;
+  --muted: #8b93a0;
+  --emerald: #c4a86e;
+  --emerald-2: #8b93a0;
+  --gold: #c4a86e;
+  --danger: #c0524a;
+  --shell-bg:
+    radial-gradient(circle at 50% -10%, rgba(196, 168, 110, .08), transparent 36rem),
+    linear-gradient(150deg, #0d1015 0%, #12151b 55%, #0b0d12 100%);
+  --surface-veil: rgba(14, 17, 22, .85);
+  --rail-veil: rgba(17, 20, 26, .8);
+  --panel-veil: rgba(22, 26, 33, .76);
+  --chip-bg: rgba(255, 255, 255, .04);
+  --input-bg: rgba(14, 17, 22, .7);
+}
+
+/* ---- Palette: Smooth — soft glass blues & lavender ---- */
+.rp-root[data-rp-palette='smooth'] {
+  --ink: #0c1220;
+  --panel: #131b2c;
+  --panel-2: #182238;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(139, 182, 255, 0.4);
+  --text: #eef3fb;
+  --muted: #93a4c2;
+  --emerald: #7fb3ff;
+  --emerald-2: #b8a6ff;
+  --gold: #ffd28a;
+  --danger: #ef8b86;
+  --shell-bg:
+    radial-gradient(circle at 50% -10%, rgba(127, 179, 255, .16), transparent 36rem),
+    linear-gradient(150deg, #0b1120 0%, #121b30 55%, #0a0f1c 100%);
+  --surface-veil: rgba(12, 18, 32, .82);
+  --rail-veil: rgba(15, 22, 38, .78);
+  --panel-veil: rgba(19, 27, 44, .74);
+  --chip-bg: rgba(127, 179, 255, .08);
+  --input-bg: rgba(12, 18, 32, .68);
+}
+
+/* ---- Palette: Relaxing — sage & sand ---- */
+.rp-root[data-rp-palette='relaxing'] {
+  --ink: #10140f;
+  --panel: #171d16;
+  --panel-2: #1c231b;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(154, 196, 140, 0.45);
+  --text: #f1f5ee;
+  --muted: #9db08f;
+  --emerald: #9ac48c;
+  --emerald-2: #d8c48a;
+  --gold: #d8c48a;
+  --danger: #d97862;
+  --shell-bg:
+    radial-gradient(circle at 50% -10%, rgba(154, 196, 140, .14), transparent 36rem),
+    linear-gradient(150deg, #0f130e 0%, #151b13 55%, #0d100c 100%);
+  --surface-veil: rgba(16, 20, 15, .82);
+  --rail-veil: rgba(20, 25, 19, .78);
+  --panel-veil: rgba(24, 30, 23, .74);
+  --chip-bg: rgba(154, 196, 140, .08);
+  --input-bg: rgba(16, 20, 15, .68);
 }
 
 .rp-root { position: relative; min-height: 100vh; background: var(--shell-bg); overflow: hidden; }

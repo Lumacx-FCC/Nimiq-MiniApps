@@ -13,7 +13,7 @@
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, Coins, Download, Image as ImageIcon,
   Languages, LoaderCircle, LockKeyhole, Menu, MessageCircle, Mic, MicOff, Moon,
-  Package, Play, Plus, Send, Sparkles, Sun, Trash2, Upload, UserRound, Volume2,
+  Package, Palette, Play, Plus, Send, Sparkles, Sun, Trash2, Upload, UserRound, Volume2,
   WandSparkles, X,
 } from 'lucide-react'
 import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -25,7 +25,9 @@ import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
 import { AVATAR_SLOTS_UNLOCK_KEY, AVATAR_SPRITE_CREDITS, DEFAULT_AVATAR_SLOTS, UNLOCKED_AVATAR_SLOTS } from '../core/config'
 import { listAvatars, persistAvatars } from '../roleplay/avatarLibrary'
-import type { AvatarProfile, ChatMessage, VoiceName } from '../roleplay/types'
+import { classifyPalette, defaultPaletteFor, PALETTE_LABELS, readPaletteOverrides, writePaletteOverride } from '../roleplay/palettes'
+import type { AvatarProfile, ChatMessage, PaletteId, VoiceName } from '../roleplay/types'
+import { PALETTE_IDS } from '../roleplay/types'
 import { downloadDataUrl, downloadJson } from '../character/library'
 import { ensureDataUrl } from '../core/referenceUtils'
 import ErrorNotice from '../components/ErrorNotice'
@@ -130,6 +132,7 @@ const COPY = {
     credits: 'credits',
     outfit: 'Outfit',
     scene: 'Scene',
+    theme: 'Theme',
     talkingWith: 'Talking with',
     voice: 'Voice',
     characterBackground: 'Character Background',
@@ -191,6 +194,7 @@ const COPY = {
     credits: 'créditos',
     outfit: 'Atuendo',
     scene: 'Escena',
+    theme: 'Tema',
     talkingWith: 'Conversando con',
     voice: 'Voz',
     characterBackground: 'Trasfondo del personaje',
@@ -451,6 +455,7 @@ export default function RoleplayStudio() {
   const [conversationSeconds, setConversationSeconds] = useState(0)
   const [usageCredits, setUsageCredits] = useState(0)
   const [extraUnlocked, setExtraUnlocked] = useState(() => localStorage.getItem(AVATAR_SLOTS_UNLOCK_KEY) === 'true')
+  const [paletteOverrides, setPaletteOverrides] = useState<Record<string, PaletteId>>(readPaletteOverrides)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [railGlow, setRailGlow] = useState(false)
   const [uploadSlot, setUploadSlot] = useState<number | null>(null)
@@ -488,6 +493,11 @@ export default function RoleplayStudio() {
   const activeAvatar = allAvatars.find(item => item.id === activeId) || BUILT_IN_AVATARS[0]
   const activeOutfit = activeAvatar.outfits.find(item => item.id === outfitId) || activeAvatar.outfits[0]
   const activeBackground = BACKGROUNDS.find(item => item.id === backgroundId) || BACKGROUNDS[0]
+  const activePalette: PaletteId = paletteOverrides[activeAvatar.id] ?? defaultPaletteFor(activeAvatar)
+
+  const changePalette = (palette: PaletteId) => {
+    setPaletteOverrides(writePaletteOverride(activeAvatar.id, palette))
+  }
   const customSlotCount = extraUnlocked ? UNLOCKED_AVATAR_SLOTS : DEFAULT_AVATAR_SLOTS
 
   // Talking requires an account (real credits back every minute).
@@ -1061,6 +1071,8 @@ export default function RoleplayStudio() {
       const detectedGender: AvatarProfile['gender'] = uploadSubject === 'object'
         ? 'object'
         : result.profile?.gender === 'female' ? 'female' : result.profile?.gender === 'male' ? 'male' : 'custom'
+      const summary = result.profile?.summary || 'A new story waits to be told.'
+      const systemPrompt = result.profile?.systemPrompt || `You are ${name}. Stay fully in character and keep spoken turns natural and concise.`
       const avatar: AvatarProfile = {
         id,
         name,
@@ -1068,8 +1080,11 @@ export default function RoleplayStudio() {
         gender: detectedGender,
         custom: true,
         slot: uploadSlot,
-        summary: { en: result.profile?.summary || 'A new story waits to be told.', es: result.profile?.summary || 'Una nueva historia espera ser contada.' },
-        systemPrompt: result.profile?.systemPrompt || `You are ${name}. Stay fully in character and keep spoken turns natural and concise.`,
+        // Auto-pick a Talk-stage theme from the generated description
+        // (Tier 5.4) — falls back to 'default' if nothing matches.
+        palette: classifyPalette(`${name} ${result.profile?.alias || ''} ${summary} ${systemPrompt}`),
+        summary: { en: summary, es: summary },
+        systemPrompt,
         outfits: [{ id: 'original', label: { en: 'Original', es: 'Original' }, spriteUrl: transparentSpriteDataUrl }],
       }
       // New avatar goes first — persistAvatars()'s localStorage-quota fallback
@@ -1175,7 +1190,7 @@ export default function RoleplayStudio() {
   }
 
   return (
-    <main className="rp-root">
+    <main className="rp-root" data-rp-palette={activePalette}>
       <div className="ambient-orb orb-one" />
       <div className="ambient-orb orb-two" />
 
@@ -1250,6 +1265,7 @@ export default function RoleplayStudio() {
             <div className="stage-selectors">
               <label><span><ImageIcon size={14} />{t.scene}</span><select value={backgroundId} onChange={event => setBackgroundId(event.target.value)}>{BACKGROUNDS.map(item => <option key={item.id} value={item.id}>{item.label[lang]}</option>)}</select><ChevronDown size={14} /></label>
               <label><span><WandSparkles size={14} />{t.outfit}</span><select value={activeOutfit.id} onChange={event => { const nextOutfit = event.target.value; setOutfitId(nextOutfit); setBackgroundId(defaultBackgroundFor(activeAvatar, nextOutfit)) }}>{activeAvatar.outfits.map(item => <option key={item.id} value={item.id}>{item.label[lang]}</option>)}</select><ChevronDown size={14} /></label>
+              <label><span><Palette size={14} />{t.theme}</span><select value={activePalette} onChange={event => changePalette(event.target.value as PaletteId)}>{PALETTE_IDS.map(id => <option key={id} value={id}>{PALETTE_LABELS[id][lang]}</option>)}</select><ChevronDown size={14} /></label>
             </div>
           </div>
 
