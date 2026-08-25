@@ -27,9 +27,12 @@ import {
   compileSheetPrompt, compileVideoPrompt, styleDirective,
 } from '../character/fields'
 import { SavedSheet, compressImageDataUrl, deleteSheet, downloadDataUrl, listSheets, saveSheet, shareDataUrl } from '../character/library'
+import { ensureDataUrl } from '../core/referenceUtils'
 import Lightbox from '../components/Lightbox'
 import ErrorNotice from '../components/ErrorNotice'
 import MicButton from '../components/MicButton'
+import UploadConsentModal from '../components/UploadConsentModal'
+import { acceptUploadConsent, hasAcceptedUploadConsent } from '../core/uploadConsent'
 
 const FREE_COUNT_KEY = 'otherme:free-generations'
 const PENDING_REFERENCE_KEY = 'otherme:pending-reference'
@@ -55,8 +58,8 @@ const COPY = {
     freeOver: 'Free generations used — log in to continue',
     loginToContinue: 'Log in to continue',
     result: 'Your Character Sheet',
-    save: 'Save',
     saved: 'Saved to your library',
+    savedBadge: 'Saved',
     saveFailed: 'This device’s app storage is full — delete an old character below, or use Image to save the sheet to your phone (you can re-upload it later as a reference).',
     downloadImg: 'Image',
     share: 'Share',
@@ -65,7 +68,7 @@ const COPY = {
     verifyEmailForCredits: 'Verify your email to unlock your welcome credits — check your inbox for the link, or resend it from your Profile page.',
     talk: 'Talk with this character',
     library: 'My characters',
-    empty: 'Nothing saved yet — generate a sheet and press Save.',
+    empty: 'Nothing saved yet — generate a sheet and it saves automatically.',
     videoTitle: 'Video prompt (bonus)',
     videoAction: 'Scene action',
     videoHelp: 'Copy into Sora, Runway or Luma to animate your character.',
@@ -100,8 +103,8 @@ const COPY = {
     freeOver: 'Generaciones gratis agotadas — inicia sesión para continuar',
     loginToContinue: 'Iniciar sesión para continuar',
     result: 'Tu Character Sheet',
-    save: 'Guardar',
     saved: 'Guardado en tu biblioteca',
+    savedBadge: 'Guardado',
     saveFailed: 'El almacenamiento de la app está lleno — elimina un personaje antiguo abajo, o usa Imagen para guardar la hoja en tu teléfono (puedes resubirla luego como referencia).',
     downloadImg: 'Imagen',
     share: 'Compartir',
@@ -110,7 +113,7 @@ const COPY = {
     verifyEmailForCredits: 'Verifica tu email para desbloquear tus créditos de bienvenida — revisa tu bandeja de entrada por el enlace, o reenvíalo desde tu perfil.',
     talk: 'Hablar con este personaje',
     library: 'Mis personajes',
-    empty: 'Nada guardado aún — genera una hoja y presiona Guardar.',
+    empty: 'Nada guardado aún — genera una hoja y se guarda automáticamente.',
     videoTitle: 'Prompt de video (bonus)',
     videoAction: 'Acción de la escena',
     videoHelp: 'Cópialo en Sora, Runway o Luma para animar tu personaje.',
@@ -164,6 +167,7 @@ export default function CharacterStudio() {
   const [freeUsed, setFreeUsed] = useState(readFreeCount)
   const [library, setLibrary] = useState<SavedSheet[]>(listSheets)
   const [lightbox, setLightbox] = useState<{ src: string, alt: string } | null>(null)
+  const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
 
   useEffect(() => {
     sessionStorage.removeItem(PENDING_REFERENCE_KEY)
@@ -204,7 +208,7 @@ export default function CharacterStudio() {
       return
     setIsAnalyzing(true)
     try {
-      const { base64, mimeType } = splitDataUrl(image)
+      const { base64, mimeType } = splitDataUrl(await ensureDataUrl(image))
       const response = await fetch(apiUrl('/api/analyze-character'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -242,8 +246,8 @@ export default function CharacterStudio() {
     setOpen(previous => ({ ...previous, fields: false, library: false, prompt: true }))
     try {
       const payload: Record<string, string> = { prompt: compiledPrompt }
-      if (image && !image.startsWith('http')) {
-        const { base64, mimeType } = splitDataUrl(image)
+      if (image) {
+        const { base64, mimeType } = splitDataUrl(await ensureDataUrl(image))
         payload.referenceImageBase64 = base64
         payload.referenceMimeType = mimeType
       }
@@ -255,7 +259,8 @@ export default function CharacterStudio() {
       const result = await response.json()
       if (!response.ok || !result.imageBase64)
         throw new Error(result.error || 'Generation failed')
-      setGeneratedImg(`data:${result.mimeType || 'image/webp'};base64,${result.imageBase64}`)
+      const imageDataUrl = `data:${result.mimeType || 'image/webp'};base64,${result.imageBase64}`
+      setGeneratedImg(imageDataUrl)
       if (!isLoggedIn) {
         const next = freeUsed + 1
         setFreeUsed(next)
@@ -263,6 +268,26 @@ export default function CharacterStudio() {
       }
       else {
         creditsApi.spend(SHEET_RENDER_CREDITS)
+      }
+      // Auto-save immediately — a render that's already been paid for (or
+      // counted against the free tier) must never be lost to a reload/crash
+      // before a separate manual Save click.
+      const sheet: SavedSheet = {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        name: formData.name || 'Character',
+        savedAt: new Date().toISOString(),
+        data: formData,
+        imageDataUrl: await compressImageDataUrl(imageDataUrl),
+      }
+      if (saveSheet(sheet)) {
+        setLibrary(listSheets())
+        setSavedThisSession(true)
+        // Saved — point them at the next step, close what they're done with.
+        setOpen(previous => ({ ...previous, prompt: false, library: false, video: true }))
+        flash(t.saved)
+      }
+      else {
+        flash(t.saveFailed, 'error')
       }
     }
     catch (error) {
@@ -287,27 +312,6 @@ export default function CharacterStudio() {
     }
     setCopied(which)
     window.setTimeout(() => setCopied(null), 2000)
-  }
-
-  const handleSave = async () => {
-    const sheet: SavedSheet = {
-      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      name: formData.name || 'Character',
-      savedAt: new Date().toISOString(),
-      data: formData,
-      // Compressed copy for the library (localStorage budget); downloads keep full size.
-      imageDataUrl: generatedImg ? await compressImageDataUrl(generatedImg) : null,
-    }
-    if (saveSheet(sheet)) {
-      setLibrary(listSheets())
-      setSavedThisSession(true)
-      // Saved — point them at the next step, close what they're done with.
-      setOpen(previous => ({ ...previous, prompt: false, library: false, video: true }))
-      flash(t.saved)
-    }
-    else {
-      flash(t.saveFailed, 'error')
-    }
   }
 
   const talkWith = (imageDataUrl: string | null, name: string) => {
@@ -335,7 +339,7 @@ export default function CharacterStudio() {
               <div
                 className="relative w-32 h-32 shrink-0 rounded-2xl overflow-hidden border-2 border-dashed flex items-center justify-center cursor-pointer"
                 style={{ borderColor: 'var(--om-teal)', background: 'var(--highlight-bg)' }}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => (hasAcceptedUploadConsent() ? fileInputRef.current?.click() : setUploadConsentOpen(true))}
               >
                 {image
                   ? <img src={image} alt="Reference" className="w-full h-full object-cover" />
@@ -505,10 +509,10 @@ export default function CharacterStudio() {
                 className="w-full h-auto rounded-xl shadow-lg cursor-zoom-in"
                 onClick={() => setLightbox({ src: generatedImg, alt: formData.name || 'Character sheet' })}
               />
-              <div className="flex gap-2 mt-3 flex-wrap">
-                <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={() => void handleSave()}>
-                  <Save size={15} />{t.save}
-                </button>
+              <div className="flex gap-2 mt-3 flex-wrap items-center">
+                <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: 'var(--om-teal)' }}>
+                  <Save size={14} />{t.savedBadge}
+                </span>
                 <button className="icon-chip" onClick={() => downloadDataUrl(generatedImg, `${formData.name.replace(/\s+/g, '-')}-sheet.webp`)}>
                   <Download size={14} />{t.downloadImg}
                 </button>
@@ -606,6 +610,18 @@ export default function CharacterStudio() {
       </div>
 
       {lightbox && <Lightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
+
+      {uploadConsentOpen && (
+        <UploadConsentModal
+          lang={lang}
+          onCancel={() => setUploadConsentOpen(false)}
+          onAccept={() => {
+            acceptUploadConsent()
+            setUploadConsentOpen(false)
+            fileInputRef.current?.click()
+          }}
+        />
+      )}
 
       {notice && notice.type === 'error'
         ? <ErrorNotice message={notice.text} lang={lang} onClose={() => setNotice(null)} />

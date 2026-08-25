@@ -30,7 +30,7 @@ const COPY = {
     title: 'Scene Creator',
     pickCharacter: 'Character',
     noCharacter: 'No character (scene only)',
-    noneSaved: 'No saved characters yet — create one first and press Save.',
+    noneSaved: 'No saved characters yet — create one first, it saves automatically.',
     goCreate: 'Create a character',
     describe: 'Describe the scene',
     placeholder: 'e.g. Standing on a cliff at dawn, wind in their coat, ruins burning in the valley below',
@@ -42,7 +42,7 @@ const COPY = {
     cost: `${SCENE_CREDITS} credits`,
     insufficient: `You need ${SCENE_CREDITS} credits to generate a scene`,
     result: 'Your scene',
-    save: 'Save',
+    savedBadge: 'Saved',
     share: 'Share',
     saved: 'Saved to your scene gallery',
     download: 'Download',
@@ -59,7 +59,7 @@ const COPY = {
     title: 'Creador de Escenas',
     pickCharacter: 'Personaje',
     noCharacter: 'Sin personaje (solo escena)',
-    noneSaved: 'Aún no hay personajes guardados — crea uno primero y presiona Guardar.',
+    noneSaved: 'Aún no hay personajes guardados — crea uno primero, se guarda automáticamente.',
     goCreate: 'Crear un personaje',
     describe: 'Describe la escena',
     placeholder: 'ej. De pie en un acantilado al amanecer, viento en su abrigo, ruinas ardiendo en el valle',
@@ -71,7 +71,7 @@ const COPY = {
     cost: `${SCENE_CREDITS} créditos`,
     insufficient: `Necesitas ${SCENE_CREDITS} créditos para generar una escena`,
     result: 'Tu escena',
-    save: 'Guardar',
+    savedBadge: 'Guardado',
     share: 'Compartir',
     saved: 'Guardada en tu galería de escenas',
     download: 'Descargar',
@@ -172,7 +172,8 @@ export default function Scenes() {
       const json = await response.json()
       if (!response.ok || !json.imageBase64)
         throw new Error(json.error || 'Generation failed')
-      setResult(`data:${json.mimeType || 'image/webp'};base64,${json.imageBase64}`)
+      const imageDataUrl = `data:${json.mimeType || 'image/webp'};base64,${json.imageBase64}`
+      setResult(imageDataUrl)
       if (usingFree) {
         const next = freeUsed + 1
         setFreeUsed(next)
@@ -181,33 +182,31 @@ export default function Scenes() {
       else {
         creditsApi.spend(SCENE_CREDITS)
       }
+      // Auto-save immediately — a render that's already been paid for (or
+      // counted against the free tier) must never be lost to a reload/crash
+      // before a separate manual Save click.
+      const scene: SavedScene = {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        name: description.trim().slice(0, 60) || 'Scene',
+        characterName: references.map(reference => reference.name).join(', ') || null,
+        prompt: description.trim(),
+        imageDataUrl,
+        savedAt: new Date().toISOString(),
+      }
+      try {
+        await saveMedia('scenes', scene)
+        setGallery(await listMedia<SavedScene>('scenes'))
+        flash(t.saved)
+      }
+      catch {
+        flash(t.failed, 'error')
+      }
     }
     catch (error) {
       flash(`${t.failed}: ${error instanceof Error ? error.message : error}`, 'error')
     }
     finally {
       setIsGenerating(false)
-    }
-  }
-
-  const saveScene = async () => {
-    if (!result)
-      return
-    const scene: SavedScene = {
-      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      name: description.trim().slice(0, 60) || 'Scene',
-      characterName: references.map(reference => reference.name).join(', ') || null,
-      prompt: description.trim(),
-      imageDataUrl: result,
-      savedAt: new Date().toISOString(),
-    }
-    try {
-      await saveMedia('scenes', scene)
-      setGallery(await listMedia<SavedScene>('scenes'))
-      flash(t.saved)
-    }
-    catch {
-      flash(t.failed, 'error')
     }
   }
 
@@ -305,8 +304,8 @@ export default function Scenes() {
                 className="w-full h-auto rounded-xl shadow-lg cursor-zoom-in"
                 onClick={() => setLightbox({ src: result, alt: description.trim() || 'Generated scene' })}
               />
-              <div className="flex gap-2 mt-3 flex-wrap">
-                <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={saveScene}><Save size={15} />{t.save}</button>
+              <div className="flex gap-2 mt-3 flex-wrap items-center">
+                <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: 'var(--om-teal)' }}><Save size={14} />{t.savedBadge}</span>
                 <button className="icon-chip" onClick={() => downloadDataUrl(result, 'otherme-scene.webp')}><Download size={14} />{t.download}</button>
                 <button className="icon-chip" onClick={() => void shareDataUrl(result, 'otherme-scene.webp', { footer: true })}><Share2 size={14} />{t.share}</button>
                 <button className="icon-chip" onClick={() => toVideo()}><Video size={14} />{t.makeVideo}</button>

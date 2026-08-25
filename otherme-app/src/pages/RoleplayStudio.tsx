@@ -23,7 +23,7 @@ import { useSettings } from '../app/providers'
 import { useAuth } from '../core/auth'
 import { apiUrl } from '../core/api'
 import { credits as creditsApi, useCredits } from '../core/credits'
-import { AVATAR_SPRITE_CREDITS } from '../core/config'
+import { AVATAR_SLOTS_UNLOCK_KEY, AVATAR_SPRITE_CREDITS, DEFAULT_AVATAR_SLOTS, UNLOCKED_AVATAR_SLOTS } from '../core/config'
 import { listAvatars, persistAvatars } from '../roleplay/avatarLibrary'
 import type { AvatarProfile, ChatMessage, VoiceName } from '../roleplay/types'
 import { downloadDataUrl, downloadJson } from '../character/library'
@@ -34,7 +34,6 @@ import '../styles/roleplay.css'
 
 const TEST_PHRASE = 'Hi there! What do you want to talk about today?'
 const LIVE_MODEL = 'gemini-3.1-flash-live-preview'
-const EXTRA_SLOTS_KEY = 'otherme:extra-slots'
 const AVATAR_HANDOFF_KEY = 'otherme:avatar-reference'
 
 const BUILT_IN_AVATARS: AvatarProfile[] = [
@@ -127,7 +126,7 @@ const COPY = {
     freeSlots: 'Custom slots',
     addCharacter: 'Add character',
     unlock: 'Unlock 5 more slots',
-    slotsFull: 'All custom slots are full — remove one to add this character.',
+    slotsFull: 'All custom slots are full — delete an existing avatar, or unlock 5 more slots for 250 credits.',
     credits: 'credits',
     outfit: 'Outfit',
     scene: 'Scene',
@@ -188,7 +187,7 @@ const COPY = {
     freeSlots: 'Espacios personalizados',
     addCharacter: 'Agregar personaje',
     unlock: 'Desbloquear 5 espacios',
-    slotsFull: 'Todos los espacios personalizados están llenos — elimina uno para agregar este personaje.',
+    slotsFull: 'Todos los espacios personalizados están llenos — elimina un avatar existente, o desbloquea 5 espacios más por 250 créditos.',
     credits: 'créditos',
     outfit: 'Atuendo',
     scene: 'Escena',
@@ -451,7 +450,7 @@ export default function RoleplayStudio() {
   const [draft, setDraft] = useState('')
   const [conversationSeconds, setConversationSeconds] = useState(0)
   const [usageCredits, setUsageCredits] = useState(0)
-  const [extraUnlocked, setExtraUnlocked] = useState(() => localStorage.getItem(EXTRA_SLOTS_KEY) === 'true')
+  const [extraUnlocked, setExtraUnlocked] = useState(() => localStorage.getItem(AVATAR_SLOTS_UNLOCK_KEY) === 'true')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [railGlow, setRailGlow] = useState(false)
   const [uploadSlot, setUploadSlot] = useState<number | null>(null)
@@ -489,7 +488,7 @@ export default function RoleplayStudio() {
   const activeAvatar = allAvatars.find(item => item.id === activeId) || BUILT_IN_AVATARS[0]
   const activeOutfit = activeAvatar.outfits.find(item => item.id === outfitId) || activeAvatar.outfits[0]
   const activeBackground = BACKGROUNDS.find(item => item.id === backgroundId) || BACKGROUNDS[0]
-  const customSlotCount = extraUnlocked ? 8 : 3
+  const customSlotCount = extraUnlocked ? UNLOCKED_AVATAR_SLOTS : DEFAULT_AVATAR_SLOTS
 
   // Talking requires an account (real credits back every minute).
   useEffect(() => {
@@ -1019,13 +1018,23 @@ export default function RoleplayStudio() {
     if (!creditsApi.spend(250))
       return flash(t.insufficient, true)
     setExtraUnlocked(true)
-    localStorage.setItem(EXTRA_SLOTS_KEY, 'true')
+    localStorage.setItem(AVATAR_SLOTS_UNLOCK_KEY, 'true')
     flash(t.unlocked)
   }
 
   const generateAvatar = async () => {
     if (!uploadFile || uploadSlot === null)
       return
+    // Defense-in-depth: today's UI only ever opens this modal on a genuinely
+    // empty, in-range slot (the empty-card click and the Character Creator
+    // handoff both guarantee it), but this guard makes it structural — a
+    // save can never silently replace an existing avatar (irreversible asset
+    // loss) or land outside the current slot cap (3, or 8 once unlocked).
+    if (uploadSlot > customSlotCount || customAvatars.some(item => item.slot === uploadSlot)) {
+      flash(t.slotsFull, true)
+      setUploadSlot(null)
+      return
+    }
     if (creditsApi.balance < AVATAR_SPRITE_CREDITS)
       return flash(t.insufficientImageCredits, true)
     setGenerating(true)
@@ -1063,7 +1072,11 @@ export default function RoleplayStudio() {
         systemPrompt: result.profile?.systemPrompt || `You are ${name}. Stay fully in character and keep spoken turns natural and concise.`,
         outfits: [{ id: 'original', label: { en: 'Original', es: 'Original' }, spriteUrl: transparentSpriteDataUrl }],
       }
-      const nextAvatars = [...customAvatars.filter(item => item.slot !== uploadSlot), avatar]
+      // New avatar goes first — persistAvatars()'s localStorage-quota fallback
+      // (avatarLibrary.ts) keeps only the front of this array, so this order
+      // guarantees the just-generated, already-credit-charged avatar is never
+      // the one silently dropped by that fallback.
+      const nextAvatars = [avatar, ...customAvatars.filter(item => item.slot !== uploadSlot)]
       setCustomAvatars(nextAvatars)
       const persisted = persistAvatars(nextAvatars)
       setOutfitId('original')

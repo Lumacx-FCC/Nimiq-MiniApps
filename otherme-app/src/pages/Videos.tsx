@@ -34,7 +34,7 @@ const COPY = {
     title: 'Video Creator',
     pickCharacter: 'Character',
     noCharacter: 'No character (free prompt)',
-    noneSaved: 'No saved characters yet — create one first and press Save.',
+    noneSaved: 'No saved characters yet — create one first, it saves automatically.',
     goCreate: 'Create a character',
     describe: 'Scene action',
     placeholder: 'e.g. Walking slowly through a crowded market, checking over their shoulder with intense suspicion',
@@ -46,7 +46,7 @@ const COPY = {
     editPlaceholder: 'e.g. Make it night time and add heavy rainfall',
     editButton: 'Apply edit',
     editsExhausted: 'All 3 edits used — generate a new video to continue.',
-    save: 'Save',
+    savedBadge: 'Saved',
     saved: 'Saved to your video gallery',
     share: 'Share',
     download: 'Download',
@@ -62,7 +62,7 @@ const COPY = {
     title: 'Creador de Videos',
     pickCharacter: 'Personaje',
     noCharacter: 'Sin personaje (prompt libre)',
-    noneSaved: 'Aún no hay personajes guardados — crea uno primero y presiona Guardar.',
+    noneSaved: 'Aún no hay personajes guardados — crea uno primero, se guarda automáticamente.',
     goCreate: 'Crear un personaje',
     describe: 'Acción de la escena',
     placeholder: 'ej. Caminando lentamente por un mercado, mirando sobre su hombro con sospecha',
@@ -74,7 +74,7 @@ const COPY = {
     editPlaceholder: 'ej. Hazlo de noche y agrega lluvia intensa',
     editButton: 'Aplicar edición',
     editsExhausted: 'Las 3 ediciones usadas — genera un nuevo video para continuar.',
-    save: 'Guardar',
+    savedBadge: 'Guardado',
     saved: 'Guardado en tu galería de videos',
     share: 'Compartir',
     download: 'Descargar',
@@ -123,7 +123,7 @@ export default function Videos() {
   })
   const [action, setAction] = useState(state.seedPrompt ?? '')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [current, setCurrent] = useState<{ dataUrl: string, interactionId: string | null, editsUsed: number } | null>(null)
+  const [current, setCurrent] = useState<{ id: string, dataUrl: string, interactionId: string | null, editsUsed: number } | null>(null)
   const [editText, setEditText] = useState('')
   const [gallery, setGallery] = useState<SavedVideo[]>([])
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -225,6 +225,31 @@ export default function Videos() {
     return { dataUrl: `data:${json.mimeType || 'video/mp4'};base64,${json.videoBase64}`, interactionId: json.interactionId as string | null }
   }
 
+  // Auto-save (upsert by id) — a render that's already been paid for must
+  // never be lost to a reload/crash before a separate manual Save click.
+  // Re-invoked after each free conversational edit too, so the saved copy
+  // always reflects the latest edit rather than going stale after the first.
+  const persistCurrent = async (next: { id: string, dataUrl: string, interactionId: string | null, editsUsed: number }) => {
+    const video: SavedVideo = {
+      id: next.id,
+      name: action.trim().slice(0, 60) || 'Video',
+      characterName: references.map(reference => reference.name).join(', ') || null,
+      prompt: action.trim(),
+      videoDataUrl: next.dataUrl,
+      interactionId: next.interactionId,
+      editsUsed: next.editsUsed,
+      savedAt: new Date().toISOString(),
+    }
+    try {
+      await saveMedia('videos', video)
+      setGallery(await listMedia<SavedVideo>('videos'))
+      flash(t.saved)
+    }
+    catch {
+      flash(t.failed, 'error')
+    }
+  }
+
   const generate = async () => {
     if (!action.trim())
       return
@@ -234,8 +259,10 @@ export default function Videos() {
     try {
       const { dataUrl, interactionId } = await callVideoApi(buildPrompt(), null)
       creditsApi.spend(VIDEO_CREDITS)
-      setCurrent({ dataUrl, interactionId, editsUsed: 0 })
+      const next = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, dataUrl, interactionId, editsUsed: 0 }
+      setCurrent(next)
       setEditText('')
+      await persistCurrent(next)
     }
     catch (error) {
       flash(`${t.failed}: ${error instanceof Error ? error.message : error}`, 'error')
@@ -251,37 +278,16 @@ export default function Videos() {
     setIsGenerating(true)
     try {
       const { dataUrl, interactionId } = await callVideoApi(editText.trim(), current.interactionId)
-      setCurrent({ dataUrl, interactionId, editsUsed: current.editsUsed + 1 })
+      const next = { id: current.id, dataUrl, interactionId, editsUsed: current.editsUsed + 1 }
+      setCurrent(next)
       setEditText('')
+      await persistCurrent(next)
     }
     catch (error) {
       flash(`${t.failed}: ${error instanceof Error ? error.message : error}`, 'error')
     }
     finally {
       setIsGenerating(false)
-    }
-  }
-
-  const saveVideo = async () => {
-    if (!current)
-      return
-    const video: SavedVideo = {
-      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      name: action.trim().slice(0, 60) || 'Video',
-      characterName: references.map(reference => reference.name).join(', ') || null,
-      prompt: action.trim(),
-      videoDataUrl: current.dataUrl,
-      interactionId: current.interactionId,
-      editsUsed: current.editsUsed,
-      savedAt: new Date().toISOString(),
-    }
-    try {
-      await saveMedia('videos', video)
-      setGallery(await listMedia<SavedVideo>('videos'))
-      flash(t.saved)
-    }
-    catch {
-      flash(t.failed, 'error')
     }
   }
 
@@ -333,8 +339,8 @@ export default function Videos() {
             <section className="om-card">
               <h2 className="text-sm font-extrabold uppercase tracking-widest mb-3" style={{ color: 'var(--text-40)' }}>{t.result}</h2>
               <video ref={videoRef} src={current.dataUrl} controls playsInline className="w-full rounded-xl shadow-lg" />
-              <div className="flex gap-2 mt-3 flex-wrap">
-                <button className="om-button green flex-1 !min-h-[42px] !text-sm" onClick={saveVideo}><Save size={15} />{t.save}</button>
+              <div className="flex gap-2 mt-3 flex-wrap items-center">
+                <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: 'var(--om-teal)' }}><Save size={14} />{t.savedBadge}</span>
                 <button className="icon-chip" onClick={() => downloadDataUrl(current.dataUrl, 'otherme-video.mp4')}><Download size={14} />{t.download}</button>
                 <button className="icon-chip" disabled={sharingKey === 'current'} onClick={() => void shareVideo(current.dataUrl, 'otherme-video.mp4', 'current')}>
                   {sharingKey === 'current' ? <RefreshCw size={14} className="animate-spin" /> : <Share2 size={14} />}{t.share}

@@ -10,8 +10,18 @@
 import type { AvatarProfile } from './types'
 import { collection, deleteDoc, doc, getDocs, query, setDoc, where } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage'
+import { AVATAR_SLOTS_UNLOCK_KEY, DEFAULT_AVATAR_SLOTS, UNLOCKED_AVATAR_SLOTS } from '../core/config'
 import { getFirebaseDb, getFirebaseStorage } from '../core/firebase'
 import { getCurrentUid, hasServerSession } from '../core/session'
+
+function unlockedSlotCount(): number {
+  try {
+    return localStorage.getItem(AVATAR_SLOTS_UNLOCK_KEY) === 'true' ? UNLOCKED_AVATAR_SLOTS : DEFAULT_AVATAR_SLOTS
+  }
+  catch {
+    return DEFAULT_AVATAR_SLOTS
+  }
+}
 
 const KEY = 'otherme:avatars'
 const AVATARS_COLLECTION = 'avatars'
@@ -104,7 +114,10 @@ export async function reconcileAvatarsWithCloud(uid: string): Promise<void> {
 
     const merged = new Map(local.map(a => [a.id, a]))
     for (const ca of cloudAvatars) merged.set(ca.id, ca)
-    localStorage.setItem(KEY, JSON.stringify(Array.from(merged.values()).slice(0, 3)))
+    // Cap to the user's actual unlocked slot count (3, or 8 once paid for) —
+    // a hardcoded 3 here would silently hide slots 4-8 on every login for
+    // anyone who unlocked the extra tier, even though nothing was deleted.
+    localStorage.setItem(KEY, JSON.stringify(Array.from(merged.values()).slice(0, unlockedSlotCount())))
   }
   catch (e) {
     console.warn('[avatarLibrary] cloud reconcile failed:', e instanceof Error ? e.message : e)

@@ -4,10 +4,12 @@
  * images as identity references — max 3 total.
  */
 import { Clapperboard, Plus, UserRound, X } from 'lucide-react'
-import { ChangeEvent, useRef } from 'react'
+import { ChangeEvent, useRef, useState } from 'react'
 import type { SavedSheet } from '../character/library'
 import type { SavedScene } from '../core/mediaStore'
 import type { Lang } from '../app/providers'
+import { acceptUploadConsent, hasAcceptedUploadConsent } from '../core/uploadConsent'
+import UploadConsentModal from './UploadConsentModal'
 
 export interface PickedReference {
   id: string
@@ -47,6 +49,7 @@ export default function ReferencePicker({ characters, scenes, value, onChange, l
 }) {
   const t = COPY[lang]
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const full = value.length >= max
 
   const toggleCharacter = (sheet: SavedSheet) => {
@@ -114,7 +117,7 @@ export default function ReferencePicker({ characters, scenes, value, onChange, l
         })}
 
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => (hasAcceptedUploadConsent() ? fileInputRef.current?.click() : setUploadConsentOpen(true))}
           disabled={full}
           className="shrink-0 w-24 rounded-xl p-2 flex flex-col items-center justify-center gap-1 border-2 border-dashed disabled:opacity-40"
           style={{ borderColor: 'var(--om-teal)', background: 'var(--highlight-bg)', color: 'var(--text-60)' }}
@@ -165,6 +168,18 @@ export default function ReferencePicker({ characters, scenes, value, onChange, l
             </span>
           ))}
         </div>
+      )}
+
+      {uploadConsentOpen && (
+        <UploadConsentModal
+          lang={lang}
+          onCancel={() => setUploadConsentOpen(false)}
+          onAccept={() => {
+            acceptUploadConsent()
+            setUploadConsentOpen(false)
+            fileInputRef.current?.click()
+          }}
+        />
       )}
     </div>
   )

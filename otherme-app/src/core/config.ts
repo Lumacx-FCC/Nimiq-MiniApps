@@ -73,6 +73,10 @@ export const FREE_SHEET_GENERATIONS = 5
 export const SHEET_RENDER_CREDITS = 1
 export const FREE_SCENE_GENERATIONS = 5
 export const AVATAR_SPRITE_CREDITS = 3
+/** Custom talking-avatar slot cap — default vs. after the one-time 250-credit unlock. */
+export const DEFAULT_AVATAR_SLOTS = 3
+export const UNLOCKED_AVATAR_SLOTS = 8
+export const AVATAR_SLOTS_UNLOCK_KEY = 'otherme:extra-slots'
 export const SCENE_CREDITS = 5
 export const VIDEO_CREDITS = 100
 export const VIDEO_MAX_EDITS = 3
