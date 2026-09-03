@@ -19,6 +19,7 @@ import {
   EVM_TREASURY_ADDRESS,
   findPack,
   getNimUsdRate,
+  getUsdCrcRate,
   LUNA_PER_NIM,
   NIM_BONUS_MULTIPLIER,
   NIM_TREASURY_ADDRESS,
@@ -28,12 +29,7 @@ import {
 } from "../config.js";
 import { userRef } from "../credits/store.js";
 
-// "paypal" is groundwork only (backlog 4.7) — createOrder below fills in a
-// well-formed order for it, but nothing routes real PayPal traffic here yet:
-// no capture-verification analog exists (Part 4 Phase 2, pending PayPal
-// Business account credentials), so a "paypal" order can be created but never
-// actually granted today.
-export type OrderMethod = "nim" | "usdt" | "paypal";
+export type OrderMethod = "nim" | "usdt" | "paypal" | "onvo";
 export type OrderStatus = "pending" | "submitted" | "confirmed" | "granted" | "failed" | "expired";
 
 export interface OrderDoc {
@@ -80,10 +76,11 @@ export async function createOrder(userId: string, method: OrderMethod, packUsd: 
   if (!userSnap.data()?.termsAcceptedAt)
     return { error: "Terms not accepted" };
 
-  // PayPal packs are the REGULAR (non-discounted) prices — the early-bird
-  // discount doesn't apply there, since PayPal's own Hosted Buttons are
-  // configured at these fixed prices, separately from PACKS.
-  const pack = method === "paypal" ? findPack(packUsd, REGULAR_PACKS) : findPack(packUsd);
+  // PayPal and ONVO packs are the REGULAR (non-discounted) prices — the
+  // early-bird discount doesn't apply there, since PayPal's Hosted Buttons
+  // and ONVO's CRC pricing are both fixed off REGULAR_PACKS, separately from
+  // the early-bird PACKS the NIM/USDT rails use.
+  const pack = method === "paypal" || method === "onvo" ? findPack(packUsd, REGULAR_PACKS) : findPack(packUsd);
   if (!pack)
     return { error: "Unknown credit pack" };
 
@@ -108,6 +105,17 @@ export async function createOrder(userId: string, method: OrderMethod, packUsd: 
     expectedAmount = pack.usd;
     expectedBaseUnits = Math.round(pack.usd * 100);
     expectedRecipient = "paypal";
+  }
+  else if (method === "onvo") {
+    // SINPE Móvil is CRC-only — convert the USD pack price at the live rate
+    // (frozen into the order, like NIM's) and freeze it so a later rate move
+    // never strands an order the customer already paid at the frozen amount.
+    // expectedBaseUnits is centavos, ONVO's smallest-unit amount (e.g. 250000
+    // = CRC 2,500.00) — see functions/src/onvo/client.ts.
+    const rate = await getUsdCrcRate();
+    expectedAmount = Math.round(pack.usd * rate * 100) / 100;
+    expectedBaseUnits = Math.round(expectedAmount * 100);
+    expectedRecipient = "onvo";
   }
   else {
     expectedAmount = pack.usd;
@@ -167,6 +175,14 @@ export async function claimOrder(
     });
     return { ok: true };
   });
+}
+
+/** Direct lookup by id, no ownership check — for callers that already have
+ * their own authorization story (the ONVO webhook) or check it themselves
+ * right after (onvo/routes.ts's handleOnvoConfirm). */
+export async function getOrderById(orderId: string): Promise<OrderWithId | null> {
+  const snap = await orders().doc(orderId).get();
+  return snap.exists ? { id: snap.id, ...(snap.data() as OrderDoc) } : null;
 }
 
 /* ------------------------------------------------------------------ */

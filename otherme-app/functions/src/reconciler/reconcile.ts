@@ -26,6 +26,7 @@ import {
   type OrderWithId,
 } from "../orders/store.js";
 import { verifyNim } from "./verifyNim.js";
+import { verifyOnvo } from "./verifyOnvo.js";
 import { verifyUsdt } from "./verifyUsdt.js";
 import type { VerifyResult } from "./verify.js";
 
@@ -50,11 +51,17 @@ async function verifyOrder(order: OrderWithId): Promise<VerifyResult | { state: 
     return verifyUsdt(order, url);
   }
   if (order.method === "paypal") {
-    // No capture-verification analog exists yet (backlog 4.7, Part 4 Phase 2 —
-    // pending PayPal Business account credentials) — skip rather than fall
-    // into the NIM branch below, which would misinterpret a PayPal order as
-    // an unconfirmed NIM payment and eventually fail it after the grace window.
+    // PayPal's own webhook (paypal/webhook.ts) is the sole granter for this
+    // rail — skip rather than fall into the NIM branch below, which would
+    // misinterpret a PayPal order as an unconfirmed NIM payment and eventually
+    // fail it after the grace window.
     return { state: "skipped" };
+  }
+  if (order.method === "onvo") {
+    // The ONVO webhook (onvo/webhook.ts) is the primary granter; this is only
+    // a safety net for a missed/delayed webhook, not the sole path like the
+    // "skipped" rails above.
+    return verifyOnvo(order, process.env.ONVO_SECRET_KEY || "");
   }
   // NIM — verify against NIMIQ_RPC_URL (our node, once up) or the public
   // NimiqWatch default. Empty default = disabled → skip (keeps the temporary

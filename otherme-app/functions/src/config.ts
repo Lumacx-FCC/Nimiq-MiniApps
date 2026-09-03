@@ -113,3 +113,30 @@ export async function getNimUsdRate(): Promise<number> {
     return NIM_USD_FALLBACK_RATE;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* SINPE Móvil (Costa Rica) via ONVO Pay                                */
+/* ------------------------------------------------------------------ */
+
+export const ONVO_API_BASE = "https://api.onvopay.com/v1";
+/** Colones per USD — used only if the live lookup below fails. Approximate;
+ * update occasionally rather than treating it as a real exchange rate. */
+export const CRC_USD_FALLBACK_RATE = 545;
+
+/** USD/CRC from a free, keyless FX API, with a static fallback — same shape
+ * as getNimUsdRate above. Frozen into the order at creation time. */
+export async function getUsdCrcRate(): Promise<number> {
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/USD");
+    if (!res.ok)
+      throw new Error(String(res.status));
+    const data = await res.json() as { rates?: { CRC?: number } };
+    const rate = data.rates?.CRC;
+    if (!rate || rate <= 0)
+      throw new Error("no rate");
+    return rate;
+  }
+  catch {
+    return CRC_USD_FALLBACK_RATE;
+  }
+}

@@ -21,7 +21,7 @@ export interface PurchaseRecord {
   txHash: string
   /** Only present for a purchase entry (welcome/migrate/spend/promo/link-merge
    * entries have none). */
-  method?: 'usdt' | 'nim' | 'paypal'
+  method?: 'usdt' | 'nim' | 'paypal' | 'onvo'
   /** Ledger kind — 'purchase' when absent, for the legacy client-trust path's
    * records (those are always purchases; only server-derived entries via
    * mapLedgerHistory set this for the other kinds). */
@@ -58,7 +58,7 @@ export type PurchaseStatus = 'idle' | 'approving' | 'submitted' | 'confirming' |
 
 export interface PurchaseFlow {
   status: PurchaseStatus
-  method?: 'usdt' | 'nim'
+  method?: 'usdt' | 'nim' | 'onvo'
   credits?: number
   amount?: number
   txHash?: string
@@ -291,7 +291,7 @@ onSessionChange((address) => {
 
 interface ServerOrder {
   orderId: string
-  method: 'nim' | 'usdt' | 'paypal'
+  method: 'nim' | 'usdt' | 'paypal' | 'onvo'
   expectedAmount: number
   expectedRecipient: string
   credits: number
@@ -301,9 +301,11 @@ interface ServerOrder {
  * Creates a server-side order doc. For 'paypal', this is audit-trail-only —
  * the PayPal Hosted Button renders and completes the payment regardless; the
  * order doc just gives the eventual webhook-driven grant (backlog 4.7 Part B)
- * something to match against.
+ * something to match against. 'onvo' works the same way, minus the "renders
+ * regardless" part — see runOnvoPurchase below, which actually drives the
+ * SINPE Móvil request through this order.
  */
-export async function createServerOrder(method: 'nim' | 'usdt' | 'paypal', packUsd: number): Promise<ServerOrder> {
+export async function createServerOrder(method: 'nim' | 'usdt' | 'paypal' | 'onvo', packUsd: number): Promise<ServerOrder> {
   const data = await authedFetch('/api/orders', { method, packUsd })
   if (!data || data.error)
     throw new Error(data?.error || 'Could not create the payment order')
@@ -537,6 +539,53 @@ export function watchPaypalOrder(orderId: string): void {
     },
     () => { /* snapshot error (offline/rules) — the next balance refetch still catches up */ },
   )
+}
+
+/** ONVO's `mobileNumber.identificationType` enum (see functions/src/onvo/client.ts's
+ * doc comment) — the Costa Rican national-ID category tied to the SINPE
+ * Móvil registration, required alongside the ID number itself. */
+export type OnvoIdentificationType = 0 | 1 | 2 | 3 | 4 | 5 | 9
+
+/**
+ * SINPE Móvil (ONVO Pay) checkout — attaches the phone number + national ID
+ * as the payment method and confirms the payment intent server-side; the
+ * order moves to 'submitted' on success, same as claimServerOrder for
+ * NIM/USDT. This does NOT grant credits — the ONVO webhook
+ * (functions/src/onvo/webhook.ts) is the sole granter, since only ONVO (or
+ * the reconciler's poll fallback) knows whether the customer actually
+ * approved the transfer in their banking app.
+ */
+async function confirmOnvoOrder(orderId: string, phone: string, identification: string, identificationType: OnvoIdentificationType): Promise<void> {
+  const data = await authedFetch('/api/onvo/confirm', { orderId, phone, identification, identificationType })
+  if (!data?.ok)
+    throw new Error(data?.error || 'Could not start the SINPE Móvil payment')
+}
+
+/**
+ * SINPE Móvil purchase flow. Unlike NIM/USDT there is no in-wallet payment
+ * step to await — the phone number IS the payment method — and confirmation
+ * is asynchronous (the customer approves the transfer in their own banking
+ * app), so this reuses the exact same watchOrder()-driven confirming/slow/
+ * granted/failed flow as the crypto rails, just replacing the payNim/payUsdt
+ * call with confirmOnvoOrder above.
+ */
+export async function runOnvoPurchase(pack: { usd: number, credits: number }, phone: string, identification: string, identificationType: OnvoIdentificationType): Promise<boolean> {
+  stopWatch()
+  creditsStore.update(s => ({ ...s, isPaying: true, error: null, flow: { status: 'approving', method: 'onvo' } }))
+  try {
+    const order = await createServerOrder('onvo', pack.usd)
+    setFlow({ credits: order.credits, amount: order.expectedAmount, orderId: order.orderId })
+    await confirmOnvoOrder(order.orderId, phone, identification, identificationType)
+    setFlow({ status: 'confirming' })
+    watchOrder(order.orderId)
+    return true
+  }
+  catch (e) {
+    stopWatch()
+    const msg = e instanceof Error ? e.message : String(e)
+    creditsStore.update(s => ({ ...s, isPaying: false, error: msg, flow: { status: 'idle', error: msg } }))
+    return false
+  }
 }
 
 /**

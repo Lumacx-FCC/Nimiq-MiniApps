@@ -11,12 +11,33 @@ import { isPaypalEnabled, renderHostedButton } from '@core/credits/payPaypal'
 import { useSettings } from '../app/providers'
 import { checkEmailVerified, resendVerificationEmail } from '../core/authProviders'
 import { useAuth } from '../core/auth'
-import { acceptTerms, createServerOrder, useCredits, watchPaypalOrder } from '../core/credits'
+import { acceptTerms, createServerOrder, type OnvoIdentificationType, runOnvoPurchase, useCredits, watchPaypalOrder } from '../core/credits'
 import { getAccountOverview } from '../core/accountLink'
-import { PAYPAL_PACKS, REGULAR_USD } from '../core/config'
+import { isOnvoEnabled, PAYPAL_PACKS, REGULAR_PACKS, REGULAR_USD } from '../core/config'
 import AppHeader from '../components/AppHeader'
 
-type CreditsMode = 'nim' | 'card' | 'history' | 'linkWallet' | null
+type CreditsMode = 'nim' | 'card' | 'sinpe' | 'history' | 'linkWallet' | null
+
+/** Costa Rican mobile numbers are 8 digits — this is just UI-level sanity
+ * (real validation happens at ONVO/the bank); accepts an optional +506. */
+function isValidCrPhone(input: string): boolean {
+  const digits = input.replace(/\D/g, '')
+  const local = digits.length === 11 && digits.startsWith('506') ? digits.slice(3) : digits
+  return /^\d{8}$/.test(local)
+}
+
+/** ONVO's mobileNumber.identificationType enum (see core/credits.ts's
+ * OnvoIdentificationType doc comment) — labelKey indexes into each
+ * language's `sinpeIdTypes` copy below. */
+const ID_TYPE_OPTIONS: { value: OnvoIdentificationType, labelKey: 'national' | 'resident' | 'state' | 'legal' | 'autonomous' | 'diplomat' | 'foreigner' }[] = [
+  { value: 0, labelKey: 'national' },
+  { value: 1, labelKey: 'resident' },
+  { value: 3, labelKey: 'legal' },
+  { value: 9, labelKey: 'foreigner' },
+  { value: 2, labelKey: 'state' },
+  { value: 4, labelKey: 'autonomous' },
+  { value: 5, labelKey: 'diplomat' },
+]
 
 const COPY = {
   en: {
@@ -56,7 +77,24 @@ const COPY = {
     termsGateError: 'Could not confirm — try again in a moment.',
     navNim: 'Buy Credits with NIM',
     navCard: 'Buy Credits with Card',
+    navSinpe: 'Pay with SINPE Móvil',
     navHistory: 'Credits History',
+    sinpePhoneLabel: 'Your SINPE Móvil phone number',
+    sinpePhonePlaceholder: '8888-8888',
+    sinpeIdTypeLabel: 'ID type',
+    sinpeIdTypes: {
+      national: 'National ID (cédula)',
+      resident: 'Resident ID (DIMEX)',
+      legal: 'Legal entity (company)',
+      foreigner: 'Foreigner',
+      state: 'State entity',
+      autonomous: 'Autonomous institution',
+      diplomat: 'Diplomat',
+    },
+    sinpeIdLabel: 'ID number',
+    sinpeIdPlaceholder: 'e.g. 1-2345-6789',
+    paySinpe: 'Pay with SINPE Móvil',
+    sinpeHelp: 'Costa Rica only. We’ll request a SINPE Móvil transfer for this amount — approve it in your banking app to complete the purchase.',
     payCardBanner: 'Prefer to pay with a card?',
     payCardTitle: 'Pay with Credit Card',
     nimiqBonusBanner: 'Get 50% more credits using Nimiq Pay',
@@ -113,7 +151,24 @@ const COPY = {
     termsGateError: 'No pudimos confirmar — intenta de nuevo en un momento.',
     navNim: 'Comprar créditos con NIM',
     navCard: 'Comprar créditos con Tarjeta',
+    navSinpe: 'Pagar con SINPE Móvil',
     navHistory: 'Historial de créditos',
+    sinpePhoneLabel: 'Tu número de SINPE Móvil',
+    sinpePhonePlaceholder: '8888-8888',
+    sinpeIdTypeLabel: 'Tipo de identificación',
+    sinpeIdTypes: {
+      national: 'Cédula física (nacional)',
+      resident: 'Cédula de residencia (DIMEX)',
+      legal: 'Persona jurídica (empresa)',
+      foreigner: 'Extranjero',
+      state: 'Entidad estatal',
+      autonomous: 'Institución autónoma',
+      diplomat: 'Diplomático',
+    },
+    sinpeIdLabel: 'Número de identificación',
+    sinpeIdPlaceholder: 'ej. 1-2345-6789',
+    paySinpe: 'Pagar con SINPE Móvil',
+    sinpeHelp: 'Solo Costa Rica. Solicitaremos una transferencia SINPE Móvil por este monto — apruébala en tu app bancaria para completar la compra.',
     payCardBanner: '¿Prefieres pagar con tarjeta?',
     payCardTitle: 'Pagar con Tarjeta',
     nimiqBonusBanner: 'Obtén 50% más créditos con Nimiq Pay',
@@ -165,6 +220,32 @@ const PAY_COPY = {
     dismiss: 'Cerrar',
     background: 'Continuar en segundo plano',
     resume: 'Pago aún confirmándose — toca para ver',
+  },
+} as const
+
+/**
+ * SINPE Móvil equivalent of PAY_COPY above, keyed the same way by
+ * `flow.status` — the wait here is "approve it in your banking app" rather
+ * than "the blockchain network is confirming it", so it needs its own copy
+ * rather than reusing PAY_COPY's crypto-flavored wording. `close`/`dismiss`/
+ * `background`/`resume` are shared from PAY_COPY (see Credits()'s flowCopy).
+ */
+const ONVO_PAY_COPY = {
+  en: {
+    approving: { title: 'Preparing your payment', body: 'Setting up your SINPE Móvil payment…' },
+    submitted: { title: 'Payment requested', body: 'We sent the SINPE Móvil request.' },
+    confirming: { title: 'Approve it in your banking app', body: 'Open your bank’s app (SMS, App, or Web Banking) and approve the SINPE Móvil transfer we requested. This usually takes under a minute — you can leave this screen open.', hint: 'Estimated wait: under a minute' },
+    slow: { title: 'Still waiting…', body: 'We haven’t received your SINPE Móvil transfer yet. If you haven’t approved it in your banking app, do that now — otherwise it may have expired; you can try again.' },
+    granted: { title: 'All set! ✨', body: 'Your SINPE Móvil payment is confirmed and your credits have been added.' },
+    failed: { title: 'We couldn’t confirm this payment', body: 'The SINPE Móvil transfer wasn’t completed or was declined. No credits were charged — you can try again.', txLabel: 'Payment ID' },
+  },
+  es: {
+    approving: { title: 'Preparando tu pago', body: 'Configurando tu pago por SINPE Móvil…' },
+    submitted: { title: 'Pago solicitado', body: 'Enviamos la solicitud de SINPE Móvil.' },
+    confirming: { title: 'Apruébalo en tu app bancaria', body: 'Abre la app de tu banco (SMS, App o Banca Web) y aprueba la transferencia SINPE Móvil que solicitamos. Esto suele tardar menos de un minuto — puedes dejar esta pantalla abierta.', hint: 'Espera estimada: menos de un minuto' },
+    slow: { title: 'Aún esperando…', body: 'Todavía no recibimos tu transferencia SINPE Móvil. Si no la has aprobado en tu app bancaria, hazlo ahora — de lo contrario puede haber expirado; puedes intentar de nuevo.' },
+    granted: { title: '¡Listo! ✨', body: 'Tu pago por SINPE Móvil está confirmado y tus créditos ya se añadieron.' },
+    failed: { title: 'No pudimos confirmar este pago', body: 'La transferencia SINPE Móvil no se completó o fue rechazada. No se te cobró nada — puedes intentar de nuevo.', txLabel: 'ID de pago' },
   },
 } as const
 
@@ -365,9 +446,21 @@ export default function Credits() {
   // First-purchase Terms & Conditions checkpoint (Tier 2.5) — a one-time gate
   // in front of whichever pay method the user actually clicked. `pendingBuy`
   // holds that choice while the checkbox confirmation is open.
-  const [pendingBuy, setPendingBuy] = useState<'nim' | 'usdt' | null>(null)
+  const [pendingBuy, setPendingBuy] = useState<'nim' | 'usdt' | 'onvo' | null>(null)
   const [termsChecked, setTermsChecked] = useState(false)
   const [termsGateState, setTermsGateState] = useState<'idle' | 'confirming' | 'error'>('idle')
+  // SINPE Móvil pack selection is separate from `selected` below — ONVO
+  // orders price off REGULAR_PACKS (undiscounted), not the early-bird PACKS
+  // the NIM/USDT tab uses, so they're different usd values, not just a
+  // different rail on the same pack.
+  const [selectedOnvo, setSelectedOnvo] = useState<{ usd: number, credits: number }>(REGULAR_PACKS[1] || REGULAR_PACKS[0])
+  const [sinpePhone, setSinpePhone] = useState('')
+  // ONVO requires the Costa Rican national-ID type + number tied to the
+  // SINPE Móvil registration, not just the phone — see core/credits.ts's
+  // OnvoIdentificationType doc comment. Defaults to the overwhelmingly common
+  // case (a national citizen's own cédula).
+  const [sinpeIdType, setSinpeIdType] = useState<OnvoIdentificationType>(0)
+  const [sinpeId, setSinpeId] = useState('')
   // Nav-driven sections: exactly one of Top Up / Credit Card / Purchases shows
   // at a time, nothing shows until a nav button (or a nudge banner) is clicked.
   const [mode, setMode] = useState<CreditsMode>(null)
@@ -415,7 +508,20 @@ export default function Credits() {
     }
     const method = pendingBuy
     setPendingBuy(null)
-    void (method === 'nim' ? buyWithNim(selected) : buyWithUsdt(selected))
+    if (method === 'onvo')
+      void runOnvoPurchase(selectedOnvo, sinpePhone, sinpeId, sinpeIdType)
+    else
+      void (method === 'nim' ? buyWithNim(selected) : buyWithUsdt(selected))
+  }
+
+  const startSinpeBuy = () => {
+    if (termsAccepted) {
+      void runOnvoPurchase(selectedOnvo, sinpePhone, sinpeId, sinpeIdType)
+      return
+    }
+    setPendingBuy('onvo')
+    setTermsChecked(false)
+    setTermsGateState('idle')
   }
   // The confirming/slow wait can run minutes long (rarely up to the reconciler's
   // 20-min grace window) — the modal must not trap the user for that whole time.
@@ -468,6 +574,9 @@ export default function Credits() {
   // PayPal is for users without a crypto wallet — hidden for wallet sign-ins,
   // shown for email/Google. Runtime gate, not a build-time one (see 4.7).
   const showPaypal = isPaypalEnabled() && user?.provider !== 'nimiq'
+  // Same competition-rules posture as PayPal (see core/config.ts's
+  // isOnvoEnabled doc comment) — hidden for wallet sign-ins.
+  const showOnvo = isOnvoEnabled() && user?.provider !== 'nimiq'
 
   const handleNimClick = () => {
     if (hasWallet)
@@ -496,7 +605,7 @@ export default function Credits() {
 
   const flowStatus = flow.status
   const flowInProgress = flowStatus === 'approving' || flowStatus === 'submitted' || flowStatus === 'confirming' || flowStatus === 'slow'
-  const flowCopy = flowStatus === 'idle' ? null : (pt as any)[flowStatus]
+  const flowCopy = flowStatus === 'idle' ? null : (flow.method === 'onvo' ? ONVO_PAY_COPY[lang] : (pt as any))[flowStatus]
 
   return (
     <div className="page-shell">
@@ -619,9 +728,14 @@ export default function Credits() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      {/* flex-wrap + a ~45% min-width lets this wrap to a clean 2-per-row
+          grid instead of overflowing off-screen — with showPaypal/showOnvo
+          both on, that's up to 4 buttons, and the parent .page-shell's
+          overflow-x:hidden was silently clipping whichever one didn't fit
+          instead of showing it, rather than actually shrinking the row. */}
+      <div className="flex flex-wrap gap-2 mb-4">
         <button
-          className="om-button secondary flex-1 !text-xs !min-h-[46px] !flex-col !gap-1"
+          className="om-button secondary flex-1 min-w-[45%] !px-2 !text-xs !min-h-[46px] !flex-col !gap-1"
           onClick={handleNimClick}
         >
           <Wallet size={16} />
@@ -629,15 +743,24 @@ export default function Credits() {
         </button>
         {showPaypal && (
           <button
-            className="om-button secondary flex-1 !text-xs !min-h-[46px] !flex-col !gap-1"
+            className="om-button secondary flex-1 min-w-[45%] !px-2 !text-xs !min-h-[46px] !flex-col !gap-1"
             onClick={handleCardClick}
           >
             <CreditCard size={16} />
             {t.navCard}
           </button>
         )}
+        {showOnvo && (
+          <button
+            className="om-button secondary flex-1 min-w-[45%] !px-2 !text-xs !min-h-[46px] !flex-col !gap-1"
+            onClick={() => setMode('sinpe')}
+          >
+            <Smartphone size={16} />
+            {t.navSinpe}
+          </button>
+        )}
         <button
-          className="om-button secondary flex-1 !text-xs !min-h-[46px] !flex-col !gap-1"
+          className="om-button secondary flex-1 min-w-[45%] !px-2 !text-xs !min-h-[46px] !flex-col !gap-1"
           onClick={() => setMode('history')}
         >
           <History size={16} />
@@ -737,6 +860,80 @@ export default function Credits() {
 
       <NewOnNimiqCard t={t} />
       </>
+      )}
+
+      {mode === 'sinpe' && showOnvo && (
+      <div className="om-card mb-4">
+        <h2 className="text-lg font-extrabold mb-3 flex items-center gap-2">
+          {t.packs}
+          <img src="/sinpe-movil-logo.png" alt="SINPE Móvil" className="h-9 w-auto rounded" />
+        </h2>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {REGULAR_PACKS.map(pack => (
+            <button
+              key={pack.usd}
+              onClick={() => setSelectedOnvo(pack)}
+              className="rounded-2xl px-2 py-4 text-center border-2 transition-colors"
+              style={{
+                borderColor: selectedOnvo.usd === pack.usd ? 'var(--nimiq-light-blue)' : 'var(--highlight-bg)',
+                background: 'transparent',
+                color: 'var(--text-100)',
+              }}
+            >
+              <div className="text-xl font-extrabold">{pack.credits}</div>
+              <div className="text-[11px]" style={{ color: 'var(--text-40)' }}>credits</div>
+              <div className="text-sm font-bold mt-1" style={{ color: 'var(--nimiq-light-blue)' }}>${pack.usd}</div>
+            </button>
+          ))}
+        </div>
+        <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-40)' }}>
+          {t.sinpePhoneLabel}
+        </label>
+        <input
+          type="tel"
+          inputMode="numeric"
+          placeholder={t.sinpePhonePlaceholder}
+          value={sinpePhone}
+          onChange={e => setSinpePhone(e.target.value)}
+          className="w-full rounded-xl px-3 py-2.5 mb-3 border-2 bg-transparent"
+          style={{ borderColor: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+        />
+        <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-40)' }}>
+          {t.sinpeIdTypeLabel}
+        </label>
+        <select
+          value={sinpeIdType}
+          onChange={e => setSinpeIdType(Number(e.target.value) as OnvoIdentificationType)}
+          className="w-full rounded-xl px-3 py-2.5 mb-3 border-2 bg-transparent"
+          style={{ borderColor: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+        >
+          {ID_TYPE_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value} style={{ color: '#000' }}>{t.sinpeIdTypes[opt.labelKey]}</option>
+          ))}
+        </select>
+        <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-40)' }}>
+          {t.sinpeIdLabel}
+        </label>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder={t.sinpeIdPlaceholder}
+          value={sinpeId}
+          onChange={e => setSinpeId(e.target.value)}
+          className="w-full rounded-xl px-3 py-2.5 mb-3 border-2 bg-transparent"
+          style={{ borderColor: 'var(--highlight-bg)', color: 'var(--text-100)' }}
+        />
+        <button
+          className="om-button gold w-full"
+          disabled={isPaying || !isValidCrPhone(sinpePhone) || sinpeId.trim().length === 0}
+          onClick={startSinpeBuy}
+        >
+          <img src="/sinpe-movil-logo.png" alt="" className="h-4 w-auto rounded-sm" />
+          {t.paySinpe}
+        </button>
+        <p className="text-xs text-center mt-2 mb-0" style={{ color: 'var(--text-40)' }}>{t.sinpeHelp}</p>
+        {error && <div className="nq-notice error" role="alert">{error}</div>}
+      </div>
       )}
 
       {mode === 'linkWallet' && <NewOnNimiqCard t={t} />}

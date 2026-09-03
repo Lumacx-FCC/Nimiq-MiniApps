@@ -105,6 +105,18 @@ img, video, canvas, svg { max-width: 100%; }
   overflow-x: hidden;
 }
 
+/* The 480px cap fits a phone-portrait WebView (this app's primary target,
+   Nimiq Pay), but was a hard ceiling even on a landscape phone or a desktop
+   browser with far more room — content just sat pinned in a narrow column
+   instead of using the space. Scale it up in steps past phone-portrait
+   widths; .wide pages (grid-heavy layouts) keep their own larger cap. */
+@media (min-width: 640px) {
+  .page-shell:not(.wide) { max-width: 640px; }
+}
+@media (min-width: 900px) {
+  .page-shell:not(.wide) { max-width: 760px; }
+}
+
 .page-shell.wide { max-width: 1100px; }
 
 .om-card {

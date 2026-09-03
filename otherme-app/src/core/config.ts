@@ -49,6 +49,22 @@ export const PAYPAL_PACKS = REGULAR_PACKS.map((pack, i) => ({
   image: ['/credit-packs/starter-30.png', '/credit-packs/value-200.png', '/credit-packs/power-1000.png'][i],
 }))
 
+// SINPE Móvil (ONVO Pay) packs — same REGULAR (non-discounted) USD prices as
+// PayPal above; the server converts to CRC at order-creation time
+// (functions/src/orders/store.ts), so the client never needs its own FX rate.
+export { REGULAR_PACKS }
+
+/**
+ * SINPE Móvil (Costa Rica) via ONVO Pay. Same competition-rules posture as
+ * PayPal (see core-modules/credits/payPaypal.ts's header comment): third-party
+ * payment providers must stay hidden for Nimiq wallet sign-ins — Credits.tsx
+ * gates visibility with the same `user?.provider !== 'nimiq'` check it already
+ * uses for `showPaypal`, not a build-time flag here.
+ */
+export function isOnvoEnabled(): boolean {
+  return true
+}
+
 /**
  * Regular (pre-discount) price per pack, keyed by the early-bird price we charge.
  * Display only — struck through next to the live price on the Credits page.

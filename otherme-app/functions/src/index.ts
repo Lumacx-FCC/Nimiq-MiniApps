@@ -23,6 +23,8 @@ import { handleAccountResolve, handleAuthChallenge, handleAuthVerify } from "./a
 import { getAuthedUid } from "./auth/requireAuth.js";
 import { handleAcceptTerms, handleBalance, handleMigrate, handleRecordPurchase, handleSpend } from "./credits/routes.js";
 import { handleClaimOrder, handleCreateOrder } from "./orders/routes.js";
+import { handleOnvoConfirm } from "./onvo/routes.js";
+import { handleOnvoWebhook } from "./onvo/webhook.js";
 import { handlePaypalWebhook } from "./paypal/webhook.js";
 import { runReconcile } from "./reconciler/reconcile.js";
 import { checkRateLimit } from "./shared/rateLimit.js";
@@ -30,6 +32,14 @@ import { checkRateLimit } from "./shared/rateLimit.js";
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const PAYPAL_CLIENT_SECRET = defineSecret("PAYPAL_CLIENT_SECRET");
+// SINPE Móvil rail (ONVO Pay). ONVO_SECRET_KEY is the Bearer key used for every
+// API call (onvo_test_secret_key_... in sandbox, onvo_live_secret_key_... in
+// production — rotate this one secret's value when going live, same posture
+// as PAYPAL_CLIENT_SECRET); ONVO_WEBHOOK_SECRET is the separate shared secret
+// from the ONVO Dashboard's webhook config, checked against the incoming
+// X-Webhook-Secret header (see onvo/webhook.ts).
+const ONVO_SECRET_KEY = defineSecret("ONVO_SECRET_KEY");
+const ONVO_WEBHOOK_SECRET = defineSecret("ONVO_WEBHOOK_SECRET");
 
 // Phase 4 reconciler RPC config, read from process.env at runtime. A secret is
 // only injected into process.env when it's listed in the schedule's `secrets`
@@ -39,7 +49,8 @@ const PAYPAL_CLIENT_SECRET = defineSecret("PAYPAL_CLIENT_SECRET");
 // stays dormant until our Nimiq node RPC secrets are created. To enable a
 // private Polygon RPC or NIM, create the secret(s) — POLYGON_RPC_URL,
 // NIMIQ_RPC_URL, NIMIQ_RPC_USER, NIMIQ_RPC_PASS — then add their names here and
-// redeploy.
+// redeploy. ONVO_SECRET_KEY is listed explicitly below (not through this
+// mechanism) since it already exists from day one, unlike those RPC secrets.
 const RECONCILE_SECRETS = ([] as string[]).map(name => defineSecret(name));
 
 if (!getApps().length) {
@@ -543,6 +554,13 @@ router.post("/orders/:id/claim", json, wrap(handleClaimOrder));
 // calls this directly; the signature check inside IS the auth. See paypal/webhook.ts.
 router.post("/paypal/webhook", json, wrap((req, res) => handlePaypalWebhook(req, res, PAYPAL_CLIENT_SECRET.value())));
 
+// SINPE Móvil (ONVO Pay). /onvo/confirm is authenticated (attaches the phone
+// number + confirms the payment intent); /onvo/webhook has no auth middleware
+// like the PayPal webhook above — the X-Webhook-Secret check inside IS the
+// auth. See onvo/routes.ts and onvo/webhook.ts.
+router.post("/onvo/confirm", json, wrap((req, res) => handleOnvoConfirm(req, res, ONVO_SECRET_KEY.value())));
+router.post("/onvo/webhook", json, wrap((req, res) => handleOnvoWebhook(req, res, ONVO_WEBHOOK_SECRET.value())));
+
 // Admin-only credit grants (contest prizes, support credits). See admin/routes.ts.
 router.post("/admin/grant-credits", json, wrap(handleGrantCredits));
 
@@ -557,7 +575,7 @@ export const api = onRequest(
   {
     memory: "1GiB",
     timeoutSeconds: 540,
-    secrets: [GEMINI_API_KEY, OPENAI_API_KEY, PAYPAL_CLIENT_SECRET],
+    secrets: [GEMINI_API_KEY, OPENAI_API_KEY, PAYPAL_CLIENT_SECRET, ONVO_SECRET_KEY, ONVO_WEBHOOK_SECRET],
   },
   app,
 );
@@ -574,7 +592,7 @@ export const reconcile = onSchedule(
     region: "us-central1",
     timeoutSeconds: 120,
     memory: "256MiB",
-    secrets: RECONCILE_SECRETS,
+    secrets: [...RECONCILE_SECRETS, ONVO_SECRET_KEY],
   },
   async () => {
     const summary = await runReconcile();

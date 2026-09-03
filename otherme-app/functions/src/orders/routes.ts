@@ -26,7 +26,9 @@ export async function handleCreateOrder(req: Request, res: Response): Promise<vo
     ? "usdt"
     : req.body?.method === "paypal"
       ? "paypal"
-      : "nim";
+      : req.body?.method === "onvo"
+        ? "onvo"
+        : "nim";
   const packUsd = Number(req.body?.packUsd);
   if (!Number.isFinite(packUsd)) {
     res.status(400).json({ error: "packUsd is required" });
